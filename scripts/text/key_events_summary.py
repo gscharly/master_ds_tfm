@@ -17,9 +17,11 @@ from collections import Counter
 
 class KeyEventsSummary:
 
-    KEY_EVENTS = ['goal']
-
-    def __init__(self):
+    def __init__(self, key_events: List[str]):
+        """
+        :param key_events: list of key events to consider. For example: ['goal', 'var']
+        """
+        self.key_events = key_events
         self.processor = ArticleTextProcessor()
         self.text_proc = BasicTextProcessor()
         self.team_players = TeamPlayers()
@@ -124,7 +126,7 @@ class KeyEventsSummary:
             tokens_en = self._process_match_text(event)
             if keep_key_events:
                 # print(tokens_en)
-                if any(key_event in tokens_en for key_event in self.KEY_EVENTS) or self._filter_red_cards(tokens_en):
+                if any(key_event in tokens_en for key_event in self.key_events) or self._filter_red_cards(tokens_en):
                     processed_events[ix_event] = ' '.join(set(tokens_en))
                     # We save the mapping between event index and new processed event index
                     n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
