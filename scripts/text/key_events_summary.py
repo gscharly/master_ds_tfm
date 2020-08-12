@@ -9,25 +9,26 @@ from scripts.conf import TEAMS
 
 import warnings
 import unidecode
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import pandas as pd
 from functools import reduce
+from collections import Counter
 
 
 class KeyEventsSummary:
 
-    KEY_EVENTS = ['goal', 'attempt']
+    KEY_EVENTS = ['goal']
 
     def __init__(self):
         self.processor = ArticleTextProcessor()
         self.text_proc = BasicTextProcessor()
         self.team_players = TeamPlayers()
-
+        # Necessary to keep track of chosen events
         self.events_mapping_list = list()
-
-        # TODO change when processing all articles
-        #season_file = 'premier_league_2019_2020.json'
+        # Will be updated with the different articles of each season
         self.league_season_teams = None
+        # Players involved in a match
+        self.match_players = None
 
     @staticmethod
     def _filter_red_cards(token_list: List[str]) -> bool:
@@ -58,6 +59,11 @@ class KeyEventsSummary:
         en_text = self.text_proc.entity_names_labels(text)
         en_proc = self.team_players.team_players_event(en_text, self.league_season_teams)
         en_list = [event_proc[0] for event_proc in en_proc]
+        # print(en_list)
+        # Save players
+        if not self.match_players:
+            self.match_players = list()
+        self.match_players.extend([en for en in en_list if en in self.team_players.players_set])
         # Filter repeated words
         filtered_tokens = [t for t in clean_tokens if not any([t in en.lower() for en in en_list])]
         # Join
@@ -71,28 +77,70 @@ class KeyEventsSummary:
         n_processed += 1
         return n_processed
 
-    def process_match_events(self, events: List[str], keep_key_events: bool = False) -> List[str]:
+    def _add_top_players_events(self, events: List[str], processed_events_dict: Dict, n_players: int):
         """
-        Processes a list of match events, cleaning tokens and identifying entity names.
+        Add players events
         :param events:
-        :param keep_key_events: only keep events with key words
+        :param processed_events_dict:
+        :param n_players:
         :return:
         """
-        processed_events = list()
+        players_appearences = Counter(self.match_players)
+        top_players = [pl[0] for pl in players_appearences.most_common(n_players)]
+        print('Adding events for', top_players)
+        n_processed_events = 0
+        for ix_event, event in enumerate(events):
+            tokens_en = self._process_match_text(event)
+            if any(player in tokens_en for player in top_players) and ix_event not in processed_events_dict.keys():
+                processed_events_dict[ix_event] = ' '.join(set(tokens_en))
+                n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
+        # Required if we reorder using new players' events
+        self.events_mapping_list = sorted(self.events_mapping_list)
+        return processed_events_dict
+
+    def process_match_events(self, events: List[str], keep_key_events: bool = False,
+                             keep_top_players: Optional[int] = None,
+                             league_season_teams: Optional[str] = None) -> List[str]:
+        """
+        Processes a list of match events, cleaning tokens and identifying entity names.
+
+        :param league_season_teams:
+        :param events:
+        :param keep_key_events: only keep events with key words
+        :param keep_top_players: whether to keep events of N most mentioned players. This value is the number of
+        most mentioned players.
+        :return:
+        """
+        if not self.league_season_teams and league_season_teams:
+            print('league_season_teams is empty. Initializing it to', league_season_teams)
+            self.league_season_teams = league_season_teams
+        if not self.league_season_teams:
+            raise ValueError('league_season_teams is empty')
+
+        processed_events = dict()
         n_processed_events = 0
         self.events_mapping_list = list()
         for ix_event, event in enumerate(events):
             tokens_en = self._process_match_text(event)
             if keep_key_events:
+                # print(tokens_en)
                 if any(key_event in tokens_en for key_event in self.KEY_EVENTS) or self._filter_red_cards(tokens_en):
-                    processed_events.append(' '.join(set(tokens_en)))
+                    processed_events[ix_event] = ' '.join(set(tokens_en))
                     # We save the mapping between event index and new processed event index
                     n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
                 else:
                     continue
             else:
-                processed_events.append(' '.join(set(tokens_en)))
+                processed_events[ix_event] = ' '.join(set(tokens_en))
                 n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
+
+        # Only do this if we are keeping a subset of events
+        if keep_top_players and keep_key_events:
+            old_length = len(processed_events)
+            processed_events = self._add_top_players_events(events, processed_events, keep_top_players)
+            new_length = len(processed_events)
+            if old_length != new_length:
+                print('Added {} new events for {} player(s)'.format(new_length - old_length, keep_top_players))
 
         if len(events) != len(processed_events) and not keep_key_events:
             warnings.warn('Length of generated events list is different from original. Some events have been lost')
@@ -100,7 +148,9 @@ class KeyEventsSummary:
         print('Number of original events:', len(events))
         print('Number of processed events:', len(processed_events))
 
-        return processed_events
+        # Return sorted events
+        # print(processed_events)
+        return [it[1] for it in sorted(processed_events.items())]
 
     def process_match_article(self, article: str) -> List[str]:
         doc_sents = self.text_proc.get_sentences(article)
@@ -111,17 +161,20 @@ class KeyEventsSummary:
             processed_sentences.append(' '.join(set(tokens_en)))
         return processed_sentences
 
-    def match_summary(self, match_dict: Dict, print_relations: bool = False, **count_vec_kwargs) -> Tuple[str, List]:
+    def match_summary(self, match_dict: Dict, print_relations: bool = False,
+                      keep_top_players: Optional[int] = None, **count_vec_kwargs) -> Tuple[str, List]:
         """
         Performs a summary based on key events. match_dict contains both events and article body from a match. Events
         and article text are processed, and then cosine distances are computed between a key event and each of the text's
         sentences. Therefore, the summary is built with the nearest sentences in the text for each key event.
         :param match_dict:
         :param print_relations:
+        :param keep_top_players:
         :param count_vec_kwargs: feeded to CountVectorizer
         :return:
         """
-        processed_events = self.process_match_events(match_dict['events'], keep_key_events=True)
+        processed_events = self.process_match_events(match_dict['events'], keep_key_events=True,
+                                                     keep_top_players=keep_top_players)
         processed_article_sentences = self.process_match_article(match_dict['article'])
         if len(processed_events) == 0 or len(processed_article_sentences) == 0:
             warnings.warn('Could not perform tfidf')
@@ -168,8 +221,8 @@ class KeyEventsSummary:
 
                 # Horrible pero es lo único que funciona para meter una lista en un df
                 pd_summary = pd.DataFrame(columns=['season_file', 'match_url', 'summary', 'article_sentences_ix', 'events_mapping'])
-                pd_summary.loc[0, 'season_file'] = season_file
-                pd_summary.loc[0, 'match_url'] = match_url
+                pd_summary.loc[0, 'json_file'] = season_file
+                pd_summary.loc[0, 'url'] = match_url
                 pd_summary.loc[0, 'summary'] = summary
                 pd_summary.loc[0, 'article_sentences_ix'] = sentences_ixs
                 pd_summary.loc[0, 'events_mapping'] = self.events_mapping_list
@@ -177,8 +230,3 @@ class KeyEventsSummary:
                 list_pd_matches.append(pd_summary)
         pd_df_matches = reduce(lambda df1, df2: pd.concat([df1, df2]), list_pd_matches)
         return pd_df_matches
-
-
-
-
-

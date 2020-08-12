@@ -1,5 +1,5 @@
 # Creating dataframe
-DATA_PATH = '/home/carlos/PycharmProjects/tfm/data'
+DATA_PATH = '/home/carlos/MasterDS/tfm/data'
 
 LITERAL_TO_LEAGUE = {
     'premier': 'premier_league',

@@ -10,7 +10,7 @@ from operator import add
 from functools import reduce
 import pandas as pd
 
-MAIN_PATH = "/home/carlos/PycharmProjects/tfm"
+MAIN_PATH = "/home/carlos/MasterDS/tfm"
 JSON_PATH = '{}/json'.format(MAIN_PATH)
 
 BANNED_CHARS = ['(', 'replaces', 'goal', 'Yellow']
@@ -51,12 +51,13 @@ class TeamPlayers:
             cond_player = tuple_event[1] in EN_LABELS['PLAYER']
             cond_teams = any([team in tuple_event[0] or tuple_event[0] in team for team in league_season_teams])
             cond_var = 'VAR' not in tuple_event[0]
+            cond_goal = 'Goal' not in tuple_event[0]
             cond_banned_chars = any(ch in tuple_event[0] for ch in BANNED_CHARS)
             # Team conditions
             cond_team = tuple_event[1] in EN_LABELS['TEAM']
             cond_any_team = any(tuple_event[0] == team for team in league_season_teams)
 
-            if cond_player and not cond_teams and cond_var and not cond_banned_chars:
+            if cond_player and not cond_teams and cond_var and not cond_banned_chars and cond_goal:
                 self.players_set.add(tuple_event[0])
                 new_event_list.append((tuple_event[0], 'PLAYER'))
             elif cond_team and cond_any_team:
@@ -134,7 +135,7 @@ class TeamPlayers:
         return teams_players_dict, players_teams_dict
 
     @staticmethod
-    def process_players_dict(players_teams_dict: Dict):
+    def process_players_dict(players_teams_dict: Dict) -> Dict:
         """
         Sum up the number of appearances of each team for each player
         :return:
