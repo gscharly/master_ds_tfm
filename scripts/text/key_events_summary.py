@@ -21,7 +21,7 @@ class KeyEventsSummary:
 
     def __init__(self, key_events: List[str]):
         """
-        :param key_events: list of key events to consider. For example: ['goal', 'var']. Red card need special token:
+        :param key_events: list of key events to consider. For example: ['goal', 'var']. Red cards need special token:
         red_card
         """
         self.key_events = key_events
