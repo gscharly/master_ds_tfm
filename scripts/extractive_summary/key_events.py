@@ -38,7 +38,7 @@ class KeyEvents:
                 and self.text_proc.filter_noisy_characters(token)
                 and not self.text_proc.has_numbers(token) and self.text_proc.token_filter_stopword(token)]
 
-    def _process_match_text(self, text: str, text_type: str = 'event') -> List:
+    def process_match_text(self, text: str, text_type: str = 'event') -> List:
         """
         Cleans tokens and retrieve entity names for a given text
         :param text:
@@ -64,20 +64,20 @@ class KeyEvents:
             self.match_players = list()
         self.match_players.extend([en for en in en_list if en in self.team_players.players_set])
         # Filter repeated words
-        filtered_tokens = [t for t in clean_tokens if not any([t in en.lower() for en in en_list])]
+        # filtered_tokens = [t for t in clean_tokens if not any([t in en.lower() for en in en_list])]
         # Join
-        tokens_en = filtered_tokens + en_list
+        # tokens_en = filtered_tokens + en_list
         # Strip accents
-        tokens_en = [unidecode.unidecode(t) for t in tokens_en]
+        tokens_en = [unidecode.unidecode(t) for t in clean_tokens]
         return tokens_en
 
     def process_match_article(self, article: str) -> List[str]:
         doc_sents = self.text_proc.get_sentences(article)
         processed_sentences = list()
         for sentence in doc_sents:
-            tokens_en = self._process_match_text(sentence, text_type='article')
+            tokens_en = self.process_match_text(sentence, text_type='article')
             # print(tokens_en)
-            processed_sentences.append(' '.join(set(tokens_en)))
+            processed_sentences.append(' '.join(tokens_en))
         return processed_sentences
 
     def _match_summary(self, match_dict: Dict, count_vec_kwargs: Dict, **key_events_properties):

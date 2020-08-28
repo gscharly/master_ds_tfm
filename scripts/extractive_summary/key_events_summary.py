@@ -46,9 +46,9 @@ class KeyEventsSummary(KeyEvents):
         print('Adding events for', top_players)
         n_processed_events = 0
         for ix_event, event in enumerate(events):
-            tokens_en = self._process_match_text(event)
+            tokens_en = self.process_match_text(event)
             if any(player in tokens_en for player in top_players) and ix_event not in processed_events_dict.keys():
-                processed_events_dict[ix_event] = ' '.join(set(tokens_en))
+                processed_events_dict[ix_event] = ' '.join(tokens_en)
                 n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
         # Required if we reorder using new players' events
         self.events_mapping_list = sorted(self.events_mapping_list)
@@ -66,7 +66,7 @@ class KeyEventsSummary(KeyEvents):
         :param key_event:
         :return:
         """
-        processed_events[ix_event] = ' '.join(set(tokens_en))
+        processed_events[ix_event] = ' '.join(tokens_en)
         # We save the mapping between event index and new processed event index
         n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
         if event:
@@ -92,7 +92,7 @@ class KeyEventsSummary(KeyEvents):
         self.events_mapping_list = list()
         self.event_sentence_dict = {key_event: dict() for key_event in self.key_events}
         for ix_event, event in enumerate(events):
-            tokens_en = self._process_match_text(event)
+            tokens_en = self.process_match_text(event)
             if keep_key_events:
                 # print(tokens_en)
                 # if any(key_event in tokens_en for key_event in self.key_events) or self._filter_red_cards(tokens_en):

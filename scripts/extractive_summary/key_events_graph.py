@@ -184,7 +184,7 @@ class KeyEventsSummaryGraph(KeyEvents):
         print('Number of original events:', len(events))
         print('Number of processed events:', len(summary_list))
 
-        return [' '.join(self._process_match_text(sum_event)) for sum_event in summary_list]
+        return [' '.join(self.process_match_text(sum_event)) for sum_event in summary_list]
 
     def match_summary(self, match_dict: Dict, count_vec_kwargs: Dict, save_relations: bool = False,
                       verbose=False, **key_events_properties) -> Tuple[str, List, List]:
