@@ -3,7 +3,7 @@ from .key_events import KeyEvents
 from scripts.conf import TEAMS
 
 import warnings
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 import pandas as pd
 from functools import reduce
 from collections import Counter
@@ -12,13 +12,16 @@ from tqdm import tqdm
 
 class KeyEventsSummary(KeyEvents):
     RED_CARD = 'red_card'
+    GOAL = 'goal'
+    ATTEMPT = 'attempt'
+    SPECIAL_EVENTS = [GOAL, RED_CARD]
 
-    def __init__(self, key_events: List[str]):
+    def __init__(self, key_events: List[str], drop_teams: bool = False):
         """
         :param key_events: list of key events to consider. For example: ['goal', 'var']. Red cards need special token:
         red_card
         """
-        super().__init__()
+        super().__init__(drop_teams=drop_teams)
         self.key_events = key_events
         # Event-sentence relations
         self.event_sentence_dict = dict()
@@ -27,6 +30,9 @@ class KeyEventsSummary(KeyEvents):
     @staticmethod
     def _filter_red_cards(token_list: List[str]) -> bool:
         return 'red' in token_list and 'card' in token_list
+
+    def _filter_attempts_in_goals(self, token_list: List[str]) -> bool:
+        return self.GOAL in token_list and self.ATTEMPT not in token_list
 
     def _update_event_mapping(self, ix_event, n_processed):
         self.events_mapping_list.append(ix_event)
@@ -98,12 +104,17 @@ class KeyEventsSummary(KeyEvents):
                 # if any(key_event in tokens_en for key_event in self.key_events) or self._filter_red_cards(tokens_en):
                 # Look for key events
                 for key_event in self.key_events:
-                    if key_event in tokens_en:
+                    # Do not include attempts that have the word "goal" (referido a porteria, no a gol)
+                    if key_event == self.GOAL and self._filter_attempts_in_goals(tokens_en):
                         self._save_key_event(processed_events, tokens_en, ix_event, n_processed_events, event,
                                              key_event)
                         break
                     # Look for red cards if no key events are found (red cards need special treatment)
                     elif key_event == self.RED_CARD and self._filter_red_cards(tokens_en):
+                        self._save_key_event(processed_events, tokens_en, ix_event, n_processed_events, event,
+                                             key_event)
+                        break
+                    elif key_event in tokens_en and key_event not in self.SPECIAL_EVENTS:
                         self._save_key_event(processed_events, tokens_en, ix_event, n_processed_events, event,
                                              key_event)
                         break
@@ -130,14 +141,12 @@ class KeyEventsSummary(KeyEvents):
         # print(processed_events)
         return [it[1] for it in sorted(processed_events.items())]
 
-    def match_summary(self, match_dict: Dict, count_vec_kwargs: Dict,
-                      save_relations: bool = False,
-                      verbose=False,
-                      **key_events_properties) -> Tuple[str, List, List]:
+    def match_summary(self, match_dict: Dict, count_vec_kwargs: Dict, save_relations: bool = False,
+                      verbose=False, **key_events_properties) -> Dict:
         """
         Performs a summary based on key events. match_dict contains both events and article body from a match. Events
-        and article text are processed, and then cosine distances are computed between a key event and each of the text's
-        sentences. Therefore, the summary is built with the nearest sentences in the text for each key event.
+        and article text are processed, and then cosine distances are computed between a key event and each of
+        the text's sentences. Therefore, the summary is built with the nearest sentences in the text for each key event.
         :param match_dict:
         :param save_relations: whether to save event-sentence relation while performing the summary
         :param verbose:
@@ -146,12 +155,11 @@ class KeyEventsSummary(KeyEvents):
         :return:
         """
 
-        article_summary, sentences_ixs, article_sents_list = self._match_summary(match_dict, count_vec_kwargs,
-                                                                                 **key_events_properties)
-        if save_relations:
-            for event_ix, sentence_ix in enumerate(sentences_ixs):
+        match_summary_info = self._match_summary(match_dict, count_vec_kwargs, **key_events_properties)
+        if save_relations and match_summary_info:
+            for event_ix, sentence_ix in enumerate(match_summary_info['sentences_ixs']):
                 event = match_dict['events'][self.events_mapping_list[event_ix]]
-                sentence = article_sents_list[sentence_ix]
+                sentence = match_summary_info['article_sents_list'][sentence_ix]
                 for event_type, events_ixs_dict in self.event_sentence_dict.items():
                     # Events and article sentences are stored for an article
                     if self.events_mapping_list[event_ix] in events_ixs_dict.keys():
@@ -161,7 +169,7 @@ class KeyEventsSummary(KeyEvents):
                     print(event)
                     print('Nearest sentence in article:')
                     print(sentence)
-        return article_summary, sentences_ixs, article_sents_list
+        return match_summary_info
 
     def run(self, save_events_sentences: bool, path_csv: str,
             path_mapping: str, count_vec_kwargs: Dict, **key_events_properties):
@@ -179,23 +187,28 @@ class KeyEventsSummary(KeyEvents):
         list_pd_matches = list()
         for season_file, season_values in tqdm(all_files.items()):
             self.league_season_teams = TEAMS[season_file.split('.')[0]]
-            for match_url, match_dict in tqdm(season_values.items()):
-                summary, sentences_ixs, article_sentences = self.match_summary(match_dict,
-                                                                               count_vec_kwargs,
-                                                                               save_relations=save_events_sentences,
-                                                                               **key_events_properties)
-                if len(summary) == 0 and len(sentences_ixs) == 0:
-                    print('Could not perform summary for {}'.format(match_url))
+            for match_url, match_dict in season_values.items():
+                match_summary_info = self.match_summary(match_dict, count_vec_kwargs,
+                                                        save_relations=save_events_sentences,
+                                                        **key_events_properties)
+
+                if not match_summary_info:
+                    warnings.warn('Could not perform summary for {}'.format(match_url))
+                    continue
+                elif len(match_summary_info['article_summary']) == 0 and len(match_summary_info['sentences_ixs']) == 0:
+                    warnings.warn('Could not perform summary for {}'.format(match_url))
                     continue
 
                 # Horrible pero es lo único que funciona para meter una lista en un df
-                pd_summary = pd.DataFrame(columns=['json_file', 'url', 'summary', 'article_sentences',
-                                                   'article_sentences_ix', 'events_mapping'])
+                pd_summary = pd.DataFrame(columns=['json_file', 'url', 'summary', 'article_sentences_ix',
+                                                   'article_sentences', 'summary_events', 'events_mapping'])
                 pd_summary.loc[0, 'json_file'] = season_file
                 pd_summary.loc[0, 'url'] = match_url
-                pd_summary.loc[0, 'summary'] = summary
-                pd_summary.loc[0, 'article_sentences'] = article_sentences
-                pd_summary.loc[0, 'article_sentences_ix'] = sentences_ixs
+                pd_summary.loc[0, 'summary'] = match_summary_info['article_summary']
+                pd_summary.loc[0, 'article_sentences_ix'] = match_summary_info['sentences_ixs']
+                pd_summary.loc[0, 'article_sentences'] = match_summary_info['article_sents_list']
+                pd_summary.loc[0, 'summary_events'] = list(map(match_dict['events'].__getitem__,
+                                                               self.events_mapping_list))
                 pd_summary.loc[0, 'events_mapping'] = self.events_mapping_list
 
                 list_pd_matches.append(pd_summary)

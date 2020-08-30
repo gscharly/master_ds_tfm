@@ -4,22 +4,29 @@ from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.pipeline import Pipeline
 import numpy as np
+import gensim.downloader as api
 
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.extractive_summary.key_events import KeyEvents
 
 
 class LearnToRank:
-    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf']
+    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'wmd']
     ROUGE_PARAMS = ['rouge_mode', 'rouge_metric']
 
-    def __init__(self, target_metric: str = 'rouge'):
+    def __init__(self, target_metric: str = 'rouge', drop_teams: bool = False):
+        """
+
+        :param target_metric: metric that will be used to build the target. One of AVAILABLE_METRICS
+        :param drop_teams: whether to include teams in the tokens
+        """
         assert target_metric in self.AVAILABLE_METRICS, 'Available metrics: {}'.format(self.AVAILABLE_METRICS)
         print('Setting target metric to', target_metric)
 
         self.target_metric = target_metric
         self.text_proc = BasicTextProcessor()
         self.key_events = KeyEvents()
+        self.drop_teams = drop_teams
 
     def _rouge(self, match_dict: Dict, verbose=False, rouge_mode='rouge-l', rouge_metric='f') -> List[Dict]:
         """
@@ -47,7 +54,7 @@ class LearnToRank:
                 print()
         return event_article_list
 
-    def _cosine_distance(self, match_dict: Dict, verbose=False, **count_vec_kwargs):
+    def _cosine_distance(self, match_dict: Dict, verbose: bool=False, **count_vec_kwargs):
         proc_events, proc_article_sents = self._process_events_article(match_dict)
         # Train tfidf with article sentences
         pipe = Pipeline([('count', CountVectorizer(**count_vec_kwargs)),
@@ -75,8 +82,37 @@ class LearnToRank:
             for event_ix in range(len(proc_events)):
                 print('Event:', match_dict['events'][event_ix])
                 print('Nearest article sentence:', article_sentences_text[sentences_ixs[event_ix]])
+                print('Processed event:', proc_events[event_ix])
+                print('Processed article sentence:', proc_article_sents[sentences_ixs[event_ix]])
                 print()
 
+        return event_article_list
+
+    def _wmd(self, match_dict: Dict, verbose: bool = False, norm: bool = True):
+        """
+        This functions uses WMD to calculate distances between events and article sentences.
+        :param match_dict:
+        :param verbose:
+        :param norm: whether to normalize the word2vec vectors
+        :return:
+        """
+        proc_events, proc_article_sents = self._process_events_article(match_dict)
+        # Download word2vec using gensim
+        model = api.load('word2vec-google-news-300')
+        if norm:
+            model.init_sims(replace=True)
+        event_article_list = list()
+        for event_ix, event in enumerate(proc_events):
+            event_ref_scores = [model.wmdistance(event, ref_sent) for ref_sent in proc_article_sents]
+            # Minimum distance
+            sentence_ix = event_ref_scores.index(min(event_ref_scores))
+            event_article_list.append(
+                {'event_ix': event_ix, 'sentence_ix': sentence_ix, 'score': min(event_ref_scores)}
+            )
+            if verbose:
+                print('Event:', event)
+                print('Nearest article sentence:', proc_article_sents[sentence_ix])
+                print()
         return event_article_list
 
     def _process_events_article(self, match_dict: Dict) -> Tuple[List[str], List[str]]:
@@ -91,9 +127,11 @@ class LearnToRank:
         if self.target_metric == 'rouge':
             article_sentences_text = [str(sent).replace('\n', '') for sent in article_sentences]
             return match_dict['events'], article_sentences_text
-        elif self.target_metric == 'cosine_tfidf':
-            proc_events = [' '.join(self.key_events.process_match_text(event)) for event in match_dict['events']]
-            proc_article_sents = self.key_events.process_match_article(match_dict['article'])
+        elif self.target_metric in ['cosine_tfidf', 'wmd']:
+            proc_events = [' '.join(self.key_events.process_match_text(event, drop_teams=self.drop_teams))
+                           for event in match_dict['events']]
+            proc_article_sents = self.key_events.process_match_article(match_dict['article'],
+                                                                       drop_teams=self.drop_teams)
             return proc_events, proc_article_sents
 
     def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_team: Optional[str] = None,
@@ -114,19 +152,19 @@ class LearnToRank:
         elif self.target_metric == 'cosine_tfidf':
             self.key_events.league_season_teams = league_season_team
             event_article_list = self._cosine_distance(match_dict, verbose, **metrics_params)
+        elif self.target_metric == 'wmd':
+            self.key_events.league_season_teams = league_season_team
+            event_article_list = self._wmd(match_dict, verbose, **metrics_params)
         else:
             raise ValueError('Metric {} is not available. Try one of {}'.format(self.target_metric,
                                                                                 self.AVAILABLE_METRICS))
         return event_article_list
 
-    def print_scores_info(self, match_dict: Dict, event_article_list: List[Dict], sort=True):
+    def print_scores_info(self, match_dict: Dict, event_article_list: List[Dict], reverse=True):
         article_sentences = self.text_proc.get_sentences(match_dict['article'])
         article_sentences_text = [str(sent).replace('\n', '') for sent in article_sentences]
-        if sort:
-            scores = sorted([(el['score'], el['event_ix'], el['sentence_ix']) for el in event_article_list],
-                            reverse=True)
-        else:
-            scores = event_article_list
+        scores = sorted([(el['score'], el['event_ix'], el['sentence_ix']) for el in event_article_list],
+                        reverse=reverse)
         for info in scores:
             print('Score:', info[0])
             print('Event:', match_dict['events'][info[1]])

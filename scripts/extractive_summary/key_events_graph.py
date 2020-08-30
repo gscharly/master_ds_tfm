@@ -13,8 +13,8 @@ import pandas as pd
 
 class KeyEventsSummaryGraph(KeyEvents):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, drop_teams: bool = False):
+        super().__init__(drop_teams=drop_teams)
         # Event-sentence relations
         self.global_event_sentence_dict = dict()
 
@@ -71,9 +71,9 @@ class KeyEventsSummaryGraph(KeyEvents):
     def _iterate_heterogeneous_hubs(self, hubs_sentences, n_sentences_summary,
                                     summary_list, summary_set, hub_percentage):
         """
-        Recursive function that allows to traverse a dictionary of nodes/sentences, extracting a number of sentences from each,
-        until the summary is completed. If the last hub is reached and still more sentences are needed, it starts again from
-        the start.
+        Recursive function that allows to traverse a dictionary of nodes/sentences, extracting a number of sentences
+        from each, until the summary is completed. If the last hub is reached and still more sentences are needed,
+        it starts again from the start.
         :param hubs_sentences:
         :param n_sentences_summary:
         :param summary_list:
@@ -148,7 +148,6 @@ class KeyEventsSummaryGraph(KeyEvents):
         semantic_graph = SemanticGraph(events)
         g = semantic_graph.create_graph()
         n_nodes = len(g.nodes)
-        # assert n_nodes >= n_hubs, "Hubs must be lower than the number of nodes. This graph has {} nodes".format(n_nodes)
 
         if n_nodes < n_hubs:
             warnings.warn('Required hubs are higher than available nodes. Using {} hubs'.format(n_nodes))
@@ -187,7 +186,7 @@ class KeyEventsSummaryGraph(KeyEvents):
         return [' '.join(self.process_match_text(sum_event)) for sum_event in summary_list]
 
     def match_summary(self, match_dict: Dict, count_vec_kwargs: Dict, save_relations: bool = False,
-                      verbose=False, **key_events_properties) -> Tuple[str, List, List]:
+                      verbose=False, **key_events_properties) -> Dict:
         """
         Performs a summary based on key events. These key events are selected performing an extractive summary of the
         events of a match.
@@ -201,19 +200,18 @@ class KeyEventsSummaryGraph(KeyEvents):
         :param count_vec_kwargs: feeded to CountVectorizer
         :return:
         """
-        article_summary, sentences_ixs, article_sents_list = self._match_summary(match_dict, count_vec_kwargs,
-                                                                                 **key_events_properties)
-        if save_relations:
-            for event_ix, sentence_ix in enumerate(sentences_ixs):
+        match_summary_info = self._match_summary(match_dict, count_vec_kwargs, **key_events_properties)
+        if save_relations and match_summary_info:
+            for event_ix, sentence_ix in enumerate(match_summary_info['sentences_ixs']):
                 event = match_dict['events'][self.events_mapping_list[event_ix]]
-                sentence = article_sents_list[sentence_ix]
+                sentence = match_summary_info['article_sents_list'][sentence_ix]
                 self.global_event_sentence_dict[event] = sentence
                 if verbose:
                     print('Event:')
                     print(event)
                     print('Nearest sentence in article:')
                     print(sentence)
-        return article_summary, sentences_ixs, article_sents_list
+        return match_summary_info
 
     def run(self, save_events_sentences: bool, path_csv: str, path_mapping: str, count_vec_kwargs: Dict,
             **key_events_properties):
@@ -236,21 +234,26 @@ class KeyEventsSummaryGraph(KeyEvents):
                     print('Could not perform summary for {}'.format(match_url))
                     continue
 
-                summary, sentences_ixs, article_sentences = self.match_summary(match_dict, count_vec_kwargs,
-                                                                               save_relations=save_events_sentences,
-                                                                               **key_events_properties)
-                if len(summary) == 0 and len(sentences_ixs) == 0:
-                    print('Could not perform summary for {}'.format(match_url))
+                match_summary_info = self.match_summary(match_dict, count_vec_kwargs,
+                                                        save_relations=save_events_sentences,
+                                                        **key_events_properties)
+                if not match_summary_info:
+                    warnings.warn('Could not perform summary for {}'.format(match_url))
+                    continue
+                elif len(match_summary_info['article_summary']) == 0 and len(match_summary_info['sentences_ixs']) == 0:
+                    warnings.warn('Could not perform summary for {}'.format(match_url))
                     continue
 
                 # Horrible pero es lo único que funciona para meter una lista en un df
-                pd_summary = pd.DataFrame(columns=['json_file', 'url', 'summary', 'article_sentences',
-                                                   'article_sentences_ix', 'events_mapping'])
+                pd_summary = pd.DataFrame(columns=['json_file', 'url', 'summary', 'article_sentences_ix',
+                                                   'article_sentences', 'summary_events', 'events_mapping'])
                 pd_summary.loc[0, 'json_file'] = season_file
                 pd_summary.loc[0, 'url'] = match_url
-                pd_summary.loc[0, 'summary'] = summary
-                pd_summary.loc[0, 'article_sentences'] = article_sentences
-                pd_summary.loc[0, 'article_sentences_ix'] = sentences_ixs
+                pd_summary.loc[0, 'summary'] = match_summary_info['article_summary']
+                pd_summary.loc[0, 'article_sentences_ix'] = match_summary_info['sentences_ixs']
+                pd_summary.loc[0, 'article_sentences'] = match_summary_info['article_sents_list']
+                pd_summary.loc[0, 'summary_events'] = list(map(match_dict['events'].__getitem__,
+                                                               self.events_mapping_list))
                 pd_summary.loc[0, 'events_mapping'] = self.events_mapping_list
 
                 list_pd_matches.append(pd_summary)

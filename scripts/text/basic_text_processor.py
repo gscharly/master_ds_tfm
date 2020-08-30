@@ -41,7 +41,7 @@ class BasicTextProcessor:
         """
         text = token.text.lower()
         wild_char = ["\n", "'s", "’s", "com", "https", "twitter", "@", "#", ".", "pa",
-                     "la", "re", "aug", "nil", "boo", "espn", "wcq", "cf", "ebb",
+                     "la", "aug", "nil", "boo", "espn", "wcq", "cf", "ebb",
                      "afc", "fc"]
         return not any(char in text for char in wild_char)
 
