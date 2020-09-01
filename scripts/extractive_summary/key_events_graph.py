@@ -13,8 +13,8 @@ import pandas as pd
 
 class KeyEventsSummaryGraph(KeyEvents):
 
-    def __init__(self, drop_teams: bool = False):
-        super().__init__(drop_teams=drop_teams)
+    def __init__(self, drop_teams: bool = False, lemma: bool = False):
+        super().__init__(drop_teams=drop_teams, lemma=lemma)
         # Event-sentence relations
         self.global_event_sentence_dict = dict()
 

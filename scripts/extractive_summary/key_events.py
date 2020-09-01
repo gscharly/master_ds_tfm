@@ -15,9 +15,10 @@ class KeyEvents:
     Interface used to define common functions for performing summaries with key events using different approaches
     """
 
-    def __init__(self, drop_teams: bool = False):
+    def __init__(self, drop_teams: bool = False, lemma: bool = False):
         """
         :param drop_teams: whether to include teams' names in tokens
+        :param lemma: whether to lemmatize words during text processing
         """
         self.processor = ArticleTextProcessor()
         self.text_proc = BasicTextProcessor()
@@ -30,6 +31,7 @@ class KeyEvents:
         self.match_players = None
 
         self.drop_teams = drop_teams
+        self.lemma = lemma
 
     def _check_league_season_teams(self, league_season_teams: Optional[str] = None):
         if not self.league_season_teams and league_season_teams:
@@ -38,9 +40,9 @@ class KeyEvents:
         if not self.league_season_teams:
             raise ValueError('league_season_teams is empty')
 
-    def _clean_tokens(self, doc, lemma: bool = False) -> List[str]:
-        if lemma:
-            return [token.lemma.lower() for token in doc if self.text_proc.token_filter(token)
+    def _clean_tokens(self, doc) -> List[str]:
+        if self.lemma:
+            return [token.lemma_.lower() for token in doc if self.text_proc.token_filter(token)
                     and self.text_proc.filter_noisy_characters(token)
                     and not self.text_proc.has_numbers(token) and self.text_proc.token_filter_stopword(token)]
         else:

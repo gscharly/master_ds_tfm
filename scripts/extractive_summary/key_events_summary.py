@@ -16,12 +16,12 @@ class KeyEventsSummary(KeyEvents):
     ATTEMPT = 'attempt'
     SPECIAL_EVENTS = [GOAL, RED_CARD]
 
-    def __init__(self, key_events: List[str], drop_teams: bool = False):
+    def __init__(self, key_events: List[str], drop_teams: bool = False, lemma: bool = False):
         """
         :param key_events: list of key events to consider. For example: ['goal', 'var']. Red cards need special token:
         red_card
         """
-        super().__init__(drop_teams=drop_teams)
+        super().__init__(drop_teams=drop_teams, lemma=lemma)
         self.key_events = key_events
         # Event-sentence relations
         self.event_sentence_dict = dict()
