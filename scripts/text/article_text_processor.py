@@ -13,7 +13,7 @@ class ArticleTextProcessor:
 
     @staticmethod
     def load_json() -> Dict:
-        with open('{}/json/final/all_files.json'.format(DATA_PATH)) as json_file:
+        with open('{}/json/final/all_files_processed.json'.format(DATA_PATH)) as json_file:
             # print(json_file)
             all_news = json.load(json_file)
         return all_news
