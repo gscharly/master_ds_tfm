@@ -98,7 +98,7 @@ def event_text(match_url, driver):
     scroll_bottom(driver)
     soup = BeautifulSoup(driver.page_source, "html.parser")
     try:
-        div_events = soup.find('ul', {'class': 'feed'}).findAll('div', {'class': 'comment-description'})
+        div_events = soup.find('ul', {'class': 'feed'}).findAll('div', {'class': ['comment-description', 'goal-title']})
         events_text = [div.get_text() for div in div_events]
         # print(events_text)
         return events_text[::-1]
@@ -147,7 +147,7 @@ def check_dates_urls(urls: List[str], year: int):
 if __name__ == '__main__':
     for year_code, year in MLS_SEASONS.items():
         driver = webdriver.Chrome(CHROMEDRIVER)
-        json_path = '../data/json/mls_{}_prueba.json'.format(year_code)
+        json_path = '../data/json/mls_{}_goals.json'.format(year_code)
         season_dict = dict()
         print(year)
         dates = create_weekly_year_calendar(year)
