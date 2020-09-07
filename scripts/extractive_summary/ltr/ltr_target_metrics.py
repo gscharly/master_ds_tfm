@@ -11,8 +11,6 @@ from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.extractive_summary.key_events import KeyEvents
 from scripts.text.article_text_processor import ArticleTextProcessor
 
-from tqdm import tqdm
-
 
 class TargetMetrics:
     """
@@ -31,21 +29,14 @@ class TargetMetrics:
 
     def _process_events_article(self, match_dict: Dict) -> Tuple[List[str], List[str]]:
         """
-        Process events and articles depending on the desired metric.
-        - rouge: extract article sentences
-        - cosine_tfidf: preprocess both events and article sentences
+        Process events and articles text.
         :param match_dict:
         :return:
         """
-        article_sentences = self.text_proc.get_sentences(match_dict['article'])
-        if self.metric == 'rouge':
-            article_sentences_text = [str(sent).replace('\n', '') for sent in article_sentences]
-            return match_dict['events'], article_sentences_text
-        elif self.metric in ['cosine_tfidf', 'wmd']:
-            proc_events = [' '.join(self.key_events.process_match_text(event))
-                           for event in match_dict['events']]
-            proc_article_sents = self.key_events.process_match_article(match_dict['article'])
-            return proc_events, proc_article_sents
+        proc_events = [' '.join(self.key_events.process_match_text(event))
+                       for event in match_dict['events']]
+        proc_article_sents = self.key_events.process_match_article(match_dict['article'])
+        return proc_events, proc_article_sents
 
     def rouge(self, match_dict: Dict, verbose=False, rouge_mode='rouge-l', rouge_metric='f') -> List[Dict]:
         """

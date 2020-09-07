@@ -1,17 +1,21 @@
 import spacy
 import pandas as pd
 import networkx as nx
-from typing import Dict, List
+from typing import Dict, List, Optional
 from spacy.tokens import Token
 from collections import OrderedDict
 import warnings
+
+from scripts.text.basic_text_processor import BasicTextProcessor
+from scripts.text.teams_players import TeamPlayers
 
 
 class SemanticGraph:
     """
     Class that creates a semantic graph given a text
     """
-    def __init__(self, events_list: List[str]):
+    def __init__(self, events_list: List[str], league_season_teams: Optional[List], drop_teams: Optional[bool] = False,
+                 only_players: Optional[bool] = False):
         self.events_list = events_list
         self.n_sentences = 0
         self.nlp = spacy.load('en_core_web_sm')
@@ -22,6 +26,13 @@ class SemanticGraph:
         self.g = None
         # Sentence-node dictionary
         self.node_dict = dict()
+
+        self.drop_teams = drop_teams
+        self.league_season_teams = league_season_teams
+        self.only_players = only_players
+
+        self.text_proc = BasicTextProcessor()
+        self.team_players = TeamPlayers()
 
     @staticmethod
     def _token_filter(token: Token) -> bool:
@@ -161,12 +172,21 @@ class SemanticGraph:
             proc_event = self._preprocess_event_text(event)
             # print("Preprocessed event:", proc_event)
             event_doc = self.nlp(proc_event)
-            # For each sentence, grab noun chunks
-            chunk_list = self._get_chunks(event_doc)
-            # print("Chunks: {}".format(chunk_list))
-            # First iteration
-            # root_list = self._traverse_chunks(chunk_list)
-            root_list = [chunk.text if chunk.ents else chunk.text.lower() for chunk in chunk_list]
+            if self.only_players:
+                en_text = self.text_proc.entity_names_labels(proc_event)
+                en_proc = self.team_players.team_players_event(en_text, self.league_season_teams)
+                chunk_list = [event_proc[0].lower() for event_proc in en_proc]
+                teams = [team.lower() for team in self.league_season_teams]
+                root_list = [tk for tk in chunk_list if not any(tk in team for team in teams)]
+            else:
+                # For each sentence, grab noun chunks
+                chunk_list = self._get_chunks(event_doc)
+                root_list = [chunk.text.lower() if chunk.ents else chunk.text.lower() for chunk in chunk_list]
+                if self.drop_teams:
+                    teams = [team.lower() for team in self.league_season_teams]
+                    # Drop any token that is included in a team's name
+                    root_list = [tk for tk in root_list if not any(tk in team for team in teams)]
+
             # print("List: {}".format(root_list))
             # Add chunk roots to node dict
             for root in root_list:

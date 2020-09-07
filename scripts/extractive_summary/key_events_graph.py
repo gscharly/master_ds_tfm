@@ -13,8 +13,8 @@ import pandas as pd
 
 class KeyEventsSummaryGraph(KeyEvents):
 
-    def __init__(self, drop_teams: bool = False, lemma: bool = False):
-        super().__init__(drop_teams=drop_teams, lemma=lemma)
+    def __init__(self, drop_teams: bool = False, lemma: bool = False, only_players: bool = False):
+        super().__init__(drop_teams=drop_teams, lemma=lemma, only_players=only_players)
         # Event-sentence relations
         self.global_event_sentence_dict = dict()
 
@@ -145,7 +145,7 @@ class KeyEventsSummaryGraph(KeyEvents):
             print('Returning an empty summary')
             return list()
         # Initialize and create graph
-        semantic_graph = SemanticGraph(events)
+        semantic_graph = SemanticGraph(events, self.league_season_teams, self.drop_teams, self.only_players)
         g = semantic_graph.create_graph()
         n_nodes = len(g.nodes)
 
@@ -201,8 +201,11 @@ class KeyEventsSummaryGraph(KeyEvents):
         :return:
         """
         match_summary_info = self._match_summary(match_dict, count_vec_kwargs, **key_events_properties)
-        if save_relations and match_summary_info:
+        if save_relations and match_summary_info and self.events_mapping_list:
             for event_ix, sentence_ix in enumerate(match_summary_info['sentences_ixs']):
+                # print(self.events_mapping_list)
+                # print(event_ix)
+                # print(match_summary_info)
                 event = match_dict['events'][self.events_mapping_list[event_ix]]
                 sentence = match_summary_info['article_sents_list'][sentence_ix]
                 self.global_event_sentence_dict[event] = sentence
@@ -252,11 +255,12 @@ class KeyEventsSummaryGraph(KeyEvents):
                 pd_summary.loc[0, 'summary'] = match_summary_info['article_summary']
                 pd_summary.loc[0, 'article_sentences_ix'] = match_summary_info['sentences_ixs']
                 pd_summary.loc[0, 'article_sentences'] = match_summary_info['article_sents_list']
-                pd_summary.loc[0, 'summary_events'] = list(map(match_dict['events'].__getitem__,
-                                                               self.events_mapping_list))
+                pd_summary.loc[0, 'summary_events'] = ' '.join(list(map(match_dict['events'].__getitem__,
+                                                               self.events_mapping_list)))
                 pd_summary.loc[0, 'events_mapping'] = self.events_mapping_list
 
                 list_pd_matches.append(pd_summary)
+
         pd_df_matches = reduce(lambda df1, df2: pd.concat([df1, df2]), list_pd_matches)
         if path_csv:
             print('Saving summaries in', path_csv)

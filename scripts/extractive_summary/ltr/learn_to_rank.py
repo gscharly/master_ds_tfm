@@ -1,19 +1,20 @@
 from typing import Dict, List, Optional
 
-from scripts.extractive_summary.ltr.ltr_target_metrics import SummaryMetrics
+from scripts.extractive_summary.ltr.ltr_target_metrics import TargetMetrics
 
 
 class LearnToRank:
 
-    def __init__(self, target_metric: str = 'rouge', drop_teams: bool = False):
+    def __init__(self, target_metric: str = 'rouge', drop_teams: bool = False, lemma: bool = False):
         """
 
         :param target_metric: metric that will be used to build the target. One of AVAILABLE_METRICS
         :param drop_teams: whether to include teams in the tokens
+        :param lemma
         """
 
         self.target_metric = target_metric
-        self.metrics = SummaryMetrics(metric=target_metric, drop_teams=drop_teams)
+        self.metrics = TargetMetrics(metric=target_metric, drop_teams=drop_teams, lemma=lemma)
 
     def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_team: Optional[str] = None,
                              **metrics_params):
@@ -25,16 +26,14 @@ class LearnToRank:
         :param metrics_params:
         :return:
         """
-
+        self.metrics.key_events.league_season_teams = league_season_team
         if self.target_metric == 'rouge':
             assert all(k in self.metrics.ROUGE_PARAMS for k in metrics_params.keys()),\
                 'Rouge params are {}'.format(self.metrics.ROUGE_PARAMS)
             event_article_list = self.metrics.rouge(match_dict, verbose, **metrics_params)
         elif self.target_metric == 'cosine_tfidf':
-            self.metrics.key_events.league_season_teams = league_season_team
             event_article_list = self.metrics.cosine_distance(match_dict, verbose, **metrics_params)
         elif self.target_metric == 'wmd':
-            self.metrics.key_events.league_season_teams = league_season_team
             event_article_list = self.metrics.wmd(match_dict, verbose, **metrics_params)
         else:
             raise ValueError('Metric {} is not available. Try one of {}'.format(self.target_metric,

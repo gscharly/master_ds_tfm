@@ -207,8 +207,8 @@ class KeyEventsSummary(KeyEvents):
                 pd_summary.loc[0, 'summary'] = match_summary_info['article_summary']
                 pd_summary.loc[0, 'article_sentences_ix'] = match_summary_info['sentences_ixs']
                 pd_summary.loc[0, 'article_sentences'] = match_summary_info['article_sents_list']
-                pd_summary.loc[0, 'summary_events'] = list(map(match_dict['events'].__getitem__,
-                                                               self.events_mapping_list))
+                pd_summary.loc[0, 'summary_events'] = ' '.join(list(map(match_dict['events'].__getitem__,
+                                                              self.events_mapping_list)))
                 pd_summary.loc[0, 'events_mapping'] = self.events_mapping_list
 
                 list_pd_matches.append(pd_summary)

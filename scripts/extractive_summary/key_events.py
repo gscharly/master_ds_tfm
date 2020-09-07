@@ -15,7 +15,7 @@ class KeyEvents:
     Interface used to define common functions for performing summaries with key events using different approaches
     """
 
-    def __init__(self, drop_teams: bool = False, lemma: bool = False):
+    def __init__(self, drop_teams: bool = False, lemma: bool = False, only_players: bool = False):
         """
         :param drop_teams: whether to include teams' names in tokens
         :param lemma: whether to lemmatize words during text processing
@@ -32,6 +32,7 @@ class KeyEvents:
 
         self.drop_teams = drop_teams
         self.lemma = lemma
+        self.only_players = only_players
 
     def _check_league_season_teams(self, league_season_teams: Optional[str] = None):
         if not self.league_season_teams and league_season_teams:
@@ -85,12 +86,18 @@ class KeyEvents:
         if self.drop_teams:
             teams = [team.lower() for team in self.league_season_teams]
             # Drop any token that is included in a team's name
+            tokens_en = [tk for tk in tokens_en if not any(tk in team for team in teams)]
 
+        if self.only_players:
+            # Keep EN and delete teams
+            tokens_en = [unidecode.unidecode(t).lower() for t in en_list]
+            teams = [team.lower() for team in self.league_season_teams]
+            # Drop any token that is included in a team's name
             tokens_en = [tk for tk in tokens_en if not any(tk in team for team in teams)]
 
         return tokens_en
 
-    def process_match_article(self, article: str, drop_teams: bool = False) -> List[str]:
+    def process_match_article(self, article: str) -> List[str]:
         doc_sents = self.text_proc.get_sentences(article)
         processed_sentences = list()
         for sentence in doc_sents:
