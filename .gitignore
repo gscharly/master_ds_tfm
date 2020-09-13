@@ -8,3 +8,4 @@ data/json
 analysis/.ipynb_checkpoints/*.ipynb
 summaries.txt
 *.pyc
+*.pickle

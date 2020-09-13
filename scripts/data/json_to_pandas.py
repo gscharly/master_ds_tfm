@@ -18,7 +18,7 @@ def json_to_pandas(news_dict: Dict) -> pd.DataFrame:
     tuple_list = list()
     for json_file, value_dict in news_dict.items():
         for url, article_info in value_dict.items():
-            t = (json_file, url, article_info['article'], article_info['events'])
+            t = (json_file, url, article_info['article'], ' '.join(article_info['events']))
             tuple_list.append(t)
     pd_info = pd.DataFrame(tuple_list,
                            columns=['json_file', 'url', 'article', 'events'])

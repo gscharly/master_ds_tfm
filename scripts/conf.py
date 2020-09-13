@@ -93,4 +93,8 @@ EN_LABELS = {
     'PLAYER': ['PERSON'],
     'TEAM': ['ORG', 'GPE', 'PERSON', 'CARDINAL', 'NORP', 'EVENT', 'FAC', 'LOC']
 }
+CSV_DATA_PATH = '{}/csv'.format(DATA_PATH)
 
+SUMMARY_PATH = CSV_DATA_PATH + '/summaries'
+ARTICLES_PATH = CSV_DATA_PATH + '/articles_events.csv'
+METRICS_PATH = DATA_PATH + '/metrics'
