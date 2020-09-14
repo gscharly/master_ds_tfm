@@ -98,8 +98,19 @@ def event_text(match_url, driver):
     scroll_bottom(driver)
     soup = BeautifulSoup(driver.page_source, "html.parser")
     try:
-        div_events = soup.find('ul', {'class': 'feed'}).findAll('div', {'class': ['comment-description', 'goal-title']})
-        events_text = [div.get_text() for div in div_events]
+        div_events = soup.find('ul', {'class': 'feed'}).findAll('div', {'class': ['comment-description', 'goal-title',
+                                                                                  'goal-text']})
+        goal_text = None
+        events_text = list()
+        for div in div_events:
+            # Goal text should be before goal-title
+            if 'goal-text' in div.get('class'):
+                goal_text = div.get_text()
+            elif 'goal-title' in div.get('class') and goal_text:
+                events_text.append(div.get_text() + '. ' + goal_text)
+            else:
+                events_text.append(div.get_text())
+
         # print(events_text)
         return events_text[::-1]
     except:

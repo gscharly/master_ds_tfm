@@ -2,6 +2,10 @@ from typing import List
 from spacy.tokens import Token
 import spacy
 
+# sklearn stuff
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.pipeline import Pipeline
+
 
 class BasicTextProcessor:
     """Class that provides basic methods for text processing"""
@@ -95,4 +99,16 @@ class BasicTextProcessor:
             doc = self.nlp(doc)
         ents_labels = [(ent.text, ent.label_) for ent in doc.ents]
         return ents_labels
+
+    @staticmethod
+    def count_stopwords(doc):
+        return len([token for token in doc if token.is_stop])
+
+    @staticmethod
+    def train_tfidf(text_list: List[str], **count_vec_kwargs):
+        pipe = Pipeline([('count', CountVectorizer(**count_vec_kwargs)),
+                         ('tfid', TfidfTransformer())])
+        x = pipe.fit_transform(text_list)
+        return {'x': x, 'pipeline': pipe}
+
 

@@ -28,10 +28,10 @@ class KeyEventsSummary(KeyEvents):
         self.global_event_sentence_dict = {key_event: dict() for key_event in self.key_events}
 
     @staticmethod
-    def _filter_red_cards(token_list: List[str]) -> bool:
+    def filter_red_cards(token_list: List[str]) -> bool:
         return 'red' in token_list and 'card' in token_list
 
-    def _filter_attempts_in_goals(self, token_list: List[str]) -> bool:
+    def filter_attempts_in_goals(self, token_list: List[str]) -> bool:
         return self.GOAL in token_list and self.ATTEMPT not in token_list
 
     def _update_event_mapping(self, ix_event, n_processed):
@@ -105,12 +105,12 @@ class KeyEventsSummary(KeyEvents):
                 # Look for key events
                 for key_event in self.key_events:
                     # Do not include attempts that have the word "goal" (referido a porteria, no a gol)
-                    if key_event == self.GOAL and self._filter_attempts_in_goals(tokens_en):
+                    if key_event == self.GOAL and self.filter_attempts_in_goals(tokens_en):
                         self._save_key_event(processed_events, tokens_en, ix_event, n_processed_events, event,
                                              key_event)
                         break
                     # Look for red cards if no key events are found (red cards need special treatment)
-                    elif key_event == self.RED_CARD and self._filter_red_cards(tokens_en):
+                    elif key_event == self.RED_CARD and self.filter_red_cards(tokens_en):
                         self._save_key_event(processed_events, tokens_en, ix_event, n_processed_events, event,
                                              key_event)
                         break

@@ -64,7 +64,7 @@ class TargetMetrics:
                 print()
         return event_article_list
 
-    def cosine_distance(self, match_dict: Dict, verbose: bool=False, **count_vec_kwargs):
+    def cosine_distance(self, match_dict: Dict, verbose: bool = False, **count_vec_kwargs):
         proc_events, proc_article_sents = self._process_events_article(match_dict)
         # Train tfidf with article sentences
         pipe = Pipeline([('count', CountVectorizer(**count_vec_kwargs)),

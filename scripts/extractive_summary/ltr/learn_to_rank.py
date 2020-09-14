@@ -16,17 +16,17 @@ class LearnToRank:
         self.target_metric = target_metric
         self.metrics = TargetMetrics(metric=target_metric, drop_teams=drop_teams, lemma=lemma)
 
-    def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_team: Optional[str] = None,
+    def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None,
                              **metrics_params):
         """
         Calculates the target for a match. Specific metric params can be passed.
         :param match_dict:
         :param verbose:
-        :param league_season_team:
+        :param league_season_teams:
         :param metrics_params:
         :return:
         """
-        self.metrics.key_events.league_season_teams = league_season_team
+        self.metrics.key_events.league_season_teams = league_season_teams
         if self.target_metric == 'rouge':
             assert all(k in self.metrics.ROUGE_PARAMS for k in metrics_params.keys()),\
                 'Rouge params are {}'.format(self.metrics.ROUGE_PARAMS)
@@ -50,3 +50,9 @@ class LearnToRank:
             print('Event:', match_dict['events'][info[1]])
             print('Nearest article sentence:', article_sentences_text[info[2]])
             print()
+
+    def create_features(self, match_dict: Dict):
+        events = match_dict['events']
+
+
+
