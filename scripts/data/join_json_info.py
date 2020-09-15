@@ -5,7 +5,7 @@ from scripts.conf import DATA_PATH
 from typing import List
 
 PATH = '{}/json'.format(DATA_PATH)
-FINAL_FILE_NAME = "all_files_processed.json"
+FINAL_FILE_NAME = "all_files.json"
 
 JSONS_WITH_BUGS = ['premier_league_2018_2019.json', 'premier_league_2016_2017.json', 'premier_league_2017_2018.json']
 BANNED_EVENTS_TOKENS = ['Lineups', 'Half begins', 'Half ends', 'Match ends', 'Full-timeMatch ends']
@@ -40,19 +40,28 @@ if __name__ == "__main__":
     onlyfiles = [f for f in listdir(PATH) if isfile(join(PATH, f)) and f != FINAL_FILE_NAME]
     all_news = dict()
     # Read each json and store in dic
+    n = 0
+    act = 0
     for f in onlyfiles:
         with open('{}/{}'.format(PATH, f)) as json_file:
             data = json.load(json_file)
         # Delete certain events and fix some bugs
         new_data = dict()
         print(f)
+
         for match_url, match_dict in data.items():
+            n += 1
             print(match_url)
             new_events = process_events(f, match_dict['events'])
-            new_data[match_url] = {'article': match_dict['article'],
-                                   'events': new_events}
+            if len(new_events) != 0 and len(match_dict['article']) != 0:
+                act += 1
+                new_data[match_url] = {'article': match_dict['article'],
+                                       'events': new_events}
 
         all_news[f] = new_data
+    print('Articles before filtering:', n)
+    print('Articles after filtering:', act)
+
     # Save to json
     with open('{}/final/{}'.format(PATH, FINAL_FILE_NAME), 'w') as outfile:
         json.dump(all_news, outfile)

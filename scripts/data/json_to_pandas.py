@@ -9,7 +9,7 @@ import pandas as pd
 
 
 def read_json(path: str) -> Dict:
-    with open('{}/json/final/all_files_processed.json'.format(path)) as json_file:
+    with open('{}/json/final/all_files.json'.format(path)) as json_file:
         all_news = json.load(json_file)
     return all_news
 
@@ -54,4 +54,4 @@ if __name__ == '__main__':
     pd_proc = process_df(pd_news)
     print('Articles after filtering:', len(pd_proc))
     # Save csv
-    pd_proc.to_csv('{}/csv/articles_events_processed.csv'.format(DATA_PATH), index=False)
+    pd_proc.to_csv('{}/csv/articles_events.csv'.format(DATA_PATH), index=False)
