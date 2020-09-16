@@ -7,7 +7,8 @@ from typing import List
 PATH = '{}/json'.format(DATA_PATH)
 FINAL_FILE_NAME = "all_files.json"
 
-JSONS_WITH_BUGS = ['premier_league_2018_2019.json', 'premier_league_2016_2017.json', 'premier_league_2017_2018.json']
+JSONS_WITH_BUGS = ['premier_league_2018_2019.json', 'premier_league_2016_2017.json', 'premier_league_2017_2018.json',
+                   'premier_league_2018_2019.json']
 BANNED_EVENTS_TOKENS = ['Lineups', 'Half begins', 'Half ends', 'Match ends', 'Full-timeMatch ends']
 
 
