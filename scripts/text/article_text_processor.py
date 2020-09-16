@@ -108,6 +108,8 @@ class ArticleTextProcessor:
         processed_sentences = list()
         for sentence in doc_sents:
             tokens_en = self.process_match_text(sentence, text_type='article')
+            if len(tokens_en) == 0:
+                continue
             # print(tokens_en)
             processed_sentences.append(' '.join(tokens_en))
         return processed_sentences

@@ -26,7 +26,7 @@ class LearnToRank:
         :param metrics_params:
         :return:
         """
-        self.metrics.key_events.league_season_teams = league_season_teams
+        self.metrics.processor.league_season_teams = league_season_teams
         if self.target_metric == 'rouge':
             assert all(k in self.metrics.ROUGE_PARAMS for k in metrics_params.keys()),\
                 'Rouge params are {}'.format(self.metrics.ROUGE_PARAMS)
@@ -52,7 +52,4 @@ class LearnToRank:
             print()
 
     def create_features(self, match_dict: Dict):
-        events = match_dict['events']
-
-
-
+        pass

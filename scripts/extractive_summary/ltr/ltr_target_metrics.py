@@ -8,7 +8,6 @@ import numpy as np
 import gensim.downloader as api
 
 from scripts.text.basic_text_processor import BasicTextProcessor
-from scripts.extractive_summary.key_events import KeyEvents
 from scripts.text.article_text_processor import ArticleTextProcessor
 
 
@@ -24,8 +23,7 @@ class TargetMetrics:
         print('Setting target metric to', metric)
         self.metric = metric
         self.text_proc = BasicTextProcessor()
-        self.key_events = KeyEvents(drop_teams=drop_teams, lemma=lemma)
-        self.processor = ArticleTextProcessor()
+        self.processor = ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
 
     def _process_events_article(self, match_dict: Dict) -> Tuple[List[str], List[str]]:
         """
@@ -33,9 +31,9 @@ class TargetMetrics:
         :param match_dict:
         :return:
         """
-        proc_events = [' '.join(self.key_events.process_match_text(event))
+        proc_events = [' '.join(self.processor.process_match_text(event))
                        for event in match_dict['events']]
-        proc_article_sents = self.key_events.process_match_article(match_dict['article'])
+        proc_article_sents = self.processor.process_match_article(match_dict['article'])
         return proc_events, proc_article_sents
 
     def rouge(self, match_dict: Dict, verbose=False, rouge_mode='rouge-l', rouge_metric='f') -> List[Dict]:
@@ -69,10 +67,10 @@ class TargetMetrics:
         # Train tfidf with article sentences
         pipe = Pipeline([('count', CountVectorizer(**count_vec_kwargs)),
                          ('tfid', TfidfTransformer())])
-        X = pipe.fit_transform(proc_article_sents)
-        X_events = pipe.transform(proc_events)
+        x = pipe.fit_transform(proc_article_sents)
+        x_events = pipe.transform(proc_events)
         # Distances
-        distances = cosine_similarity(X_events, X)
+        distances = cosine_similarity(x_events, x)
         sentences_ixs = distances.argmax(axis=1)
         event_article_list = [{'event_ix': event_ix,
                                'sentence_ix': sentences_ixs[event_ix],
