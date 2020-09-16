@@ -1,5 +1,6 @@
 # Scripts
 from scripts.text.basic_text_processor import BasicTextProcessor
+from scripts.text.article_text_processor import ArticleTextProcessor
 from scripts.extractive_summary.key_events_summary import KeyEventsSummary
 
 # sklearn stuff
@@ -18,7 +19,8 @@ import warnings
 class LTRFeatures:
 
     def __init__(self, key_events: List[str], lags: List[int] = None, drop_teams: bool = False, lemma: bool = False):
-        self.key_events_sum = KeyEventsSummary(key_events=key_events, drop_teams=drop_teams, lemma=lemma)
+        self.key_events_sum = KeyEventsSummary(key_events=key_events)
+        self.processor = ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
         self.text_proc = BasicTextProcessor()
         self.lemma = lemma
 
@@ -47,12 +49,9 @@ class LTRFeatures:
 
     def _get_players(self, event: str) -> List:
         en_text = self.text_proc.entity_names_labels(event)
-        en_proc = self.key_events_sum.team_players.team_players_event(en_text, self.key_events_sum.league_season_teams)
+        en_proc = self.processor.team_players.team_players_event(en_text, self.processor.league_season_teams)
         player_list = [t for t in en_proc if t[1] == 'PLAYER']
         return player_list
-
-    def _get_numbers(self, doc) -> List[str]:
-        return [token.text.lower() for token in doc if self.text_proc.has_numbers(token)]
 
     def _event_changes(self, event_doc: str, proc_event: List[str]):
         """
@@ -67,7 +66,7 @@ class LTRFeatures:
             'advantage': 0
         }
         if self.key_events_sum.filter_attempts_in_goals(proc_event):
-            result_list = self._get_numbers(event_doc)
+            result_list = self.text_proc.get_numbers(event_doc)
             if len(result_list) != 2:
                 warnings.warn("There are more than 2 results")
                 return dict()
@@ -139,7 +138,7 @@ class LTRFeatures:
         Returns a dict with the percentage of events where each player appears.
         :return:
         """
-        players_appearences = Counter(self.key_events_sum.match_players)
+        players_appearences = Counter(self.processor.match_players)
         n_events = sum(players_appearences.values())
         return {player_tuple[0]: player_tuple[1]/n_events for player_tuple in players_appearences.most_common()}
 
@@ -154,7 +153,7 @@ class LTRFeatures:
         :param count_vec_kwargs:
         :return:
         """
-        processed_events = [' '.join(self.key_events_sum.process_match_text(event)) for event in events]
+        processed_events = [' '.join(self.processor.process_match_text(event)) for event in events]
         # TFIDF sum
         tfidf_dict = self.text_proc.train_tfidf(processed_events, **count_vec_kwargs)
         tfidf_sum_list = np.sum(tfidf_dict['x'], axis=1)
@@ -196,7 +195,7 @@ class LTRFeatures:
             warnings.warn('There are no events')
             return dict()
 
-        self.key_events_sum.league_season_teams = league_season_teams
+        self.processor.league_season_teams = league_season_teams
         match_level_features = self._match_level_features(match_dict['events'], **count_vec_kwargs)
 
         all_events_feature_dict = dict()

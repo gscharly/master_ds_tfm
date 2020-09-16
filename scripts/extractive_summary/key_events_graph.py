@@ -145,7 +145,8 @@ class KeyEventsSummaryGraph(KeyEvents):
             print('Returning an empty summary')
             return list()
         # Initialize and create graph
-        semantic_graph = SemanticGraph(events, self.league_season_teams, self.drop_teams, self.only_players)
+        semantic_graph = SemanticGraph(events, self.processor.league_season_teams, self.processor.drop_teams,
+                                       self.processor.only_players)
         g = semantic_graph.create_graph()
         n_nodes = len(g.nodes)
 
@@ -183,7 +184,7 @@ class KeyEventsSummaryGraph(KeyEvents):
         print('Number of original events:', len(events))
         print('Number of processed events:', len(summary_list))
 
-        return [' '.join(self.process_match_text(sum_event)) for sum_event in summary_list]
+        return [' '.join(self.processor.process_match_text(sum_event)) for sum_event in summary_list]
 
     def match_summary(self, match_dict: Dict, count_vec_kwargs: Dict, save_relations: bool = False,
                       verbose=False, **key_events_properties) -> Dict:
@@ -231,7 +232,7 @@ class KeyEventsSummaryGraph(KeyEvents):
         all_files = self.processor.load_json()
         list_pd_matches = list()
         for season_file, season_values in tqdm(all_files.items()):
-            self.league_season_teams = TEAMS[season_file.split('.')[0]]
+            self.processor.league_season_teams = TEAMS[season_file.split('.')[0]]
             for match_url, match_dict in season_values.items():
                 if len(match_dict['events']) == 0 or len(match_dict['article']) == 0:
                     print('Could not perform summary for {}'.format(match_url))

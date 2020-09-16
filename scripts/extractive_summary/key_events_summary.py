@@ -47,12 +47,12 @@ class KeyEventsSummary(KeyEvents):
         :param n_players:
         :return:
         """
-        players_appearences = Counter(self.match_players)
+        players_appearences = Counter(self.processor.match_players)
         top_players = [pl[0] for pl in players_appearences.most_common(n_players)]
         print('Adding events for', top_players)
         n_processed_events = 0
         for ix_event, event in enumerate(events):
-            tokens_en = self.process_match_text(event)
+            tokens_en = self.processor.process_match_text(event)
             if any(player in tokens_en for player in top_players) and ix_event not in processed_events_dict.keys():
                 processed_events_dict[ix_event] = ' '.join(tokens_en)
                 n_processed_events = self._update_event_mapping(ix_event, n_processed_events)
@@ -98,7 +98,7 @@ class KeyEventsSummary(KeyEvents):
         self.events_mapping_list = list()
         self.event_sentence_dict = {key_event: dict() for key_event in self.key_events}
         for ix_event, event in enumerate(events):
-            tokens_en = self.process_match_text(event)
+            tokens_en = self.processor.process_match_text(event)
             if keep_key_events:
                 # print(tokens_en)
                 # if any(key_event in tokens_en for key_event in self.key_events) or self._filter_red_cards(tokens_en):
@@ -186,7 +186,7 @@ class KeyEventsSummary(KeyEvents):
         all_files = self.processor.load_json()
         list_pd_matches = list()
         for season_file, season_values in tqdm(all_files.items()):
-            self.league_season_teams = TEAMS[season_file.split('.')[0]]
+            self.processor.league_season_teams = TEAMS[season_file.split('.')[0]]
             for match_url, match_dict in season_values.items():
                 match_summary_info = self.match_summary(match_dict, count_vec_kwargs,
                                                         save_relations=save_events_sentences,
@@ -208,7 +208,7 @@ class KeyEventsSummary(KeyEvents):
                 pd_summary.loc[0, 'article_sentences_ix'] = match_summary_info['sentences_ixs']
                 pd_summary.loc[0, 'article_sentences'] = match_summary_info['article_sents_list']
                 pd_summary.loc[0, 'summary_events'] = ' '.join(list(map(match_dict['events'].__getitem__,
-                                                              self.events_mapping_list)))
+                                                               self.events_mapping_list)))
                 pd_summary.loc[0, 'events_mapping'] = self.events_mapping_list
 
                 list_pd_matches.append(pd_summary)

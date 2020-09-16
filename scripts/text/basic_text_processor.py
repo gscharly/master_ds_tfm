@@ -100,6 +100,9 @@ class BasicTextProcessor:
         ents_labels = [(ent.text, ent.label_) for ent in doc.ents]
         return ents_labels
 
+    def entity_names_events(self, list_events: List[str]):
+        return [self.entity_names_labels(event) for event in list_events]
+
     @staticmethod
     def count_stopwords(doc):
         return len([token for token in doc if token.is_stop])
@@ -111,4 +114,5 @@ class BasicTextProcessor:
         x = pipe.fit_transform(text_list)
         return {'x': x, 'pipeline': pipe}
 
-
+    def get_numbers(self, doc):
+        return [token.text.lower() for token in doc if self.has_numbers(token)]

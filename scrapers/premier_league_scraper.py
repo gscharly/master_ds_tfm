@@ -1,4 +1,4 @@
-from .constants import CHROMEDRIVER
+from scrapers.constants import CHROMEDRIVER
 from bs4 import BeautifulSoup
 import os
 from selenium import webdriver
@@ -11,10 +11,10 @@ import time
 import json
 
 SEASON_URL_DICT = {
-    '2016_2017': '54',
-    '2017_2018': '79',
-    '2018_2019': '210',
-    #'19-20': '274'
+    # '2016_2017': '54',
+    # '2017_2018': '79',
+    # '2018_2019': '210',
+    '2019-2020': '274'
 }
 
 SCROLL_PAUSE_TIME = 0.5

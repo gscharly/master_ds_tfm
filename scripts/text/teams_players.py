@@ -2,7 +2,7 @@
 Generation of players and teams dataset from the articles and events files.
 """
 
-from scripts.text.article_text_processor import ArticleTextProcessor
+from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.conf import TEAMS, EN_LABELS
 from typing import List, Tuple, Dict
 from collections import Counter
@@ -18,8 +18,7 @@ BANNED_CHARS = ['(', 'replaces', 'goal', 'Yellow']
 
 class TeamPlayers:
     def __init__(self):
-        self.atp = ArticleTextProcessor()
-        self.all_files = self.atp.load_json()
+        self.text_proc = BasicTextProcessor()
         self.players_set = set()
         self.teams_set = set()
         # Team: list players
@@ -31,7 +30,8 @@ class TeamPlayers:
 
     def teams_players_sets(self, en_events: List[List[Tuple[str, str]]], teams_file: str):
         """
-        Generates sets corresponding to players and teams, and returns a processed list of events, adding new tags to entity names: TEAM or PLAYER
+        Generates sets corresponding to players and teams, and returns a processed list of events,
+        adding new tags to entity names: TEAM or PLAYER
         :return:
         """
         league_season_teams = TEAMS[teams_file]
@@ -110,7 +110,7 @@ class TeamPlayers:
                 # team = None
                 for t_type in event:
                     # Actualiza lista jugadores
-                    if t_type[1] == 'PLAYER' :
+                    if t_type[1] == 'PLAYER':
                         if '(' in t_type[0]:
                             print(event)
                         player = t_type[0]
@@ -193,7 +193,7 @@ class TeamPlayers:
             player_team = Counter(teams).most_common(1)[0][0]
             new_players_dict[player] = player_team
             if new_teams_dict.get(player_team):
-                team_set = set(new_teams_dict[player_team])
+                team_set = set(new_teams_dict.get(player_team))
                 team_set.add(player)
                 new_teams_dict[player_team] = team_set
             else:
@@ -202,8 +202,8 @@ class TeamPlayers:
         self.players_teams_dict = new_players_dict
 
     def check_missing_players(self):
-        """Check for players that appear in events where no team is specified. These players will appear one time in each time,
-        and they will hopefully be correctly classified with more matches
+        """Check for players that appear in events where no team is specified. These players will appear one time
+        in each time, and they will hopefully be correctly classified with more matches
         """
         for player, teams in self.players_teams_dict.items():
             if len(teams) == 0:
@@ -243,9 +243,9 @@ class TeamPlayers:
         len_events = len(article_events_dict['events'])
         return len_article > 0 and len_events > 0
 
-    def run_file(self, season_file: str):
+    def run_file(self, all_files: Dict, season_file: str):
         not_consired_matches = 0
-        season_dict = self.all_files[season_file]
+        season_dict = all_files[season_file]
         # Init
         self.teams_players_dict = dict()
         self.players_teams_dict = dict()
@@ -254,14 +254,15 @@ class TeamPlayers:
             if not self._informed_events_articles(article_events_dict):
                 print('No article or events for', url)
                 continue
-            en_events_text = self.atp.entity_names_events(article_events_dict['events'])
+            # en_events_text = self.text_proc.entity_names_labels(article_events_dict['events'])
+            en_events_text = self.text_proc.entity_names_events(article_events_dict['events'])
             en_events_proc = self.teams_players_sets(en_events_text, season_file.split('.')[0])
             if len(self.teams_set) != 2:
                 print(url)
                 print(self.teams_set)
-                not_consired_matches+=1
-                #print(article_events_dict['events'])
-                #print(en_events_text)
+                not_consired_matches += 1
+                # print(article_events_dict['events'])
+                # print(en_events_text)
                 continue
             teams_players_dict, players_teams_dict = self.teams_players_dicts(en_events_proc)
             players_teams_dict_proc = self.process_players_dict(players_teams_dict)
@@ -272,16 +273,15 @@ class TeamPlayers:
         self.check_for_errors()
         print('{} not considered matches for {}'.format(not_consired_matches, season_file))
 
-    def run(self):
+    def run(self, all_files: Dict):
         list_df = list()
-        for season_file in self.all_files.keys():
+        for season_file in all_files.keys():
             print(season_file)
-            self.run_file(season_file)
-            #print(self.players_teams_dict)
-            #print(self.teams_players_dict)
+            self.run_file(all_files, season_file)
+            # print(self.players_teams_dict)
+            # print(self.teams_players_dict)
             pd_df_season = self._player_dict_to_pandas(season_file)
             print(pd_df_season.head())
             list_df.append(pd_df_season)
         pd_all = reduce(lambda df1, df2: pd.concat([df1, df2]), list_df)
         pd_all.to_csv('{}/data/csv/players_teams.csv'.format(MAIN_PATH))
-
