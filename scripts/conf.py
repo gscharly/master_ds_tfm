@@ -40,7 +40,7 @@ MLS_2015_2016 = MLS_2016_2017 + ['Comunicaciones', 'Alajuelense', 'Charlotte Ind
 # Entity names
 TEAMS = {
     "premier_league_2019_2020": ['Liverpool', 'Manchester City', 'Leicester City', 'Chelsea', 'Manchester United', 'Wolverhampton Wanderers', 'Sheffield United', 'Tottenham Hotspur',
-                                'Arsenal', 'Burnley', 'Crystal Palace', 'Everton', 'Newcastle United', 'Southampton', 'Brighton Hove Albion', 'Brighton', 'West Ham United', 'Watford', 'Bournemouth',
+                                'Arsenal', 'Burnley', 'Crystal Palace', 'Everton', 'Newcastle United', 'Southampton', 'Brighton and Hove Albion', 'West Ham United', 'Watford', 'Bournemouth',
                                 'Aston Villa', 'Norwich City'],
     "premier_league_2018_2019": ['Liverpool', 'Manchester City', 'Leicester City', 'Chelsea', 'Manchester United', 'Wolverhampton Wanderers', 'Fulham', 'Tottenham Hotspur',
                                 'Arsenal', 'Burnley', 'Crystal Palace', 'Everton', 'Newcastle United', 'Southampton', 'Brighton Hove Albion', 'Brighton', 'West Ham United', 'Watford', 'Bournemouth',
