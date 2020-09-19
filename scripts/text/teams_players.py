@@ -17,7 +17,7 @@ BANNED_CHARS = ['(', 'replaces', 'goal', 'Yellow']
 
 
 class TeamPlayers:
-    def __init__(self, all_files: Dict):
+    def __init__(self):
         self.text_proc = BasicTextProcessor()
         self.players_set = set()
         self.teams_set = set()
@@ -27,7 +27,6 @@ class TeamPlayers:
         self.players_teams_dict = dict()
         # Url: teams
         self.url_teams = dict()
-        self.all_files = all_files
 
     def teams_players_sets(self, en_events: List[List[Tuple[str, str]]], teams_file: str):
         """
@@ -244,9 +243,9 @@ class TeamPlayers:
         len_events = len(article_events_dict['events'])
         return len_article > 0 and len_events > 0
 
-    def run_file(self, season_file: str):
+    def run_file(self, all_files: Dict, season_file: str):
         not_consired_matches = 0
-        season_dict = self.all_files[season_file]
+        season_dict = all_files[season_file]
         # Init
         self.teams_players_dict = dict()
         self.players_teams_dict = dict()
@@ -274,11 +273,11 @@ class TeamPlayers:
         self.check_for_errors()
         print('{} not considered matches for {}'.format(not_consired_matches, season_file))
 
-    def run(self):
+    def run(self, all_files: Dict):
         list_df = list()
-        for season_file in self.all_files.keys():
+        for season_file in all_files.keys():
             print(season_file)
-            self.run_file(season_file)
+            self.run_file(all_files, season_file)
             # print(self.players_teams_dict)
             # print(self.teams_players_dict)
             pd_df_season = self._player_dict_to_pandas(season_file)

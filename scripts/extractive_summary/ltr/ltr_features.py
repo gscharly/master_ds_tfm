@@ -11,16 +11,17 @@ import numpy as np
 import pandas as pd
 
 # Other imports
-from typing import Dict, List
+from typing import Dict, List, Optional
 from collections import OrderedDict, Counter
 import warnings
 
 
 class LTRFeatures:
 
-    def __init__(self, key_events: List[str], lags: List[int] = None, drop_teams: bool = False, lemma: bool = False):
+    def __init__(self, key_events: List[str], lags: List[int] = None, drop_teams: bool = False, lemma: bool = False,
+                 processor: Optional[ArticleTextProcessor] = None):
         self.key_events_sum = KeyEventsSummary(key_events=key_events)
-        self.processor = ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
+        self.processor = processor if processor else ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
         self.text_proc = BasicTextProcessor()
         self.lemma = lemma
 
@@ -69,7 +70,8 @@ class LTRFeatures:
             result_list = self.text_proc.get_numbers(event_doc)
             if len(result_list) != 2:
                 warnings.warn("There are more than 2 results")
-                return dict()
+                print(result_list)
+                return change_dict
             if result_list[0] == result_list[1]:
                 change_dict['equalize'] += 1
             else:
@@ -182,7 +184,7 @@ class LTRFeatures:
             all_events_feature_dict[k].append(v)
         return all_events_feature_dict
 
-    def create_features(self, match_dict: Dict, league_season_teams: str, **count_vec_kwargs) -> Dict:
+    def create_features(self, match_dict: Dict, league_season_teams: Optional[str], **count_vec_kwargs) -> Dict:
         """
         Create features for every event. It returns a Dict, where each key is a feature containing a list with all
         of the values for each event.
@@ -195,7 +197,9 @@ class LTRFeatures:
             warnings.warn('There are no events')
             return dict()
 
-        self.processor.league_season_teams = league_season_teams
+        if league_season_teams:
+            self.processor.league_season_teams = league_season_teams
+
         match_level_features = self._match_level_features(match_dict['events'], **count_vec_kwargs)
 
         all_events_feature_dict = dict()

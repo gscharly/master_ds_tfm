@@ -1,10 +1,11 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 from rouge import Rouge
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.pipeline import Pipeline
 import numpy as np
+import pandas as pd
 import gensim.downloader as api
 
 from scripts.text.basic_text_processor import BasicTextProcessor
@@ -18,12 +19,13 @@ class TargetMetrics:
     AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'wmd']
     ROUGE_PARAMS = ['rouge_mode', 'rouge_metric']
 
-    def __init__(self, metric: str, drop_teams: bool = False, lemma: bool = False):
+    def __init__(self, metric: str, drop_teams: bool = False, lemma: bool = False,
+                 processor: Optional[ArticleTextProcessor] = None):
         assert metric in self.AVAILABLE_METRICS, 'Available metrics: {}'.format(self.AVAILABLE_METRICS)
         print('Setting target metric to', metric)
         self.metric = metric
         self.text_proc = BasicTextProcessor()
-        self.processor = ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
+        self.processor = processor if processor else ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
 
     def _process_events_article(self, match_dict: Dict) -> Tuple[List[str], List[str]]:
         """
@@ -34,6 +36,9 @@ class TargetMetrics:
         proc_events = [' '.join(self.processor.process_match_text(event))
                        for event in match_dict['events']]
         proc_article_sents = self.processor.process_match_article(match_dict['article'])
+        # Some events and articles are empty after processing
+        # proc_events_fil = list(filter(lambda event: event != '', proc_events))
+        # proc_article_sents_fil = list(filter(lambda sent: sent != '', proc_article_sents))
         return proc_events, proc_article_sents
 
     def rouge(self, match_dict: Dict, verbose=False, rouge_mode='rouge-l', rouge_metric='f') -> List[Dict]:
@@ -50,8 +55,10 @@ class TargetMetrics:
         rouge = Rouge(metrics=[rouge_mode])
         event_article_list = list()
         for event_ix, event in enumerate(proc_events):
-            event_ref_scores = [rouge.get_scores(event, ref_sent) for ref_sent in proc_article_sents]
-            event_ref_f_scores = [scores[0][rouge_mode][rouge_metric] for scores in event_ref_scores]
+            # Some events and articles are empty after processing
+            event_ref_scores = [rouge.get_scores(event, ref_sent) if event and ref_sent else list()
+                                for ref_sent in proc_article_sents]
+            event_ref_f_scores = [scores[0][rouge_mode][rouge_metric] if scores else 0 for scores in event_ref_scores]
             sentence_ix = event_ref_f_scores.index(max(event_ref_f_scores))
             event_article_list.append(
                 {'event_ix': event_ix, 'sentence_ix': sentence_ix, 'score': max(event_ref_f_scores)}
@@ -114,3 +121,48 @@ class TargetMetrics:
                 print('Nearest article sentence:', proc_article_sents[sentence_ix])
                 print()
         return event_article_list
+
+    def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None,
+                             **metrics_params):
+        """
+        Calculates the target for a match. Specific metric params can be passed.
+        :param match_dict:
+        :param verbose:
+        :param league_season_teams:
+        :param metrics_params:
+        :return:
+        """
+        if league_season_teams:
+            self.processor.league_season_teams = league_season_teams
+
+        if self.metric == 'rouge':
+            assert all(k in self.ROUGE_PARAMS for k in metrics_params.keys()),\
+                'Rouge params are {}'.format(self.ROUGE_PARAMS)
+            event_article_list = self.rouge(match_dict, verbose, **metrics_params)
+        elif self.metric == 'cosine_tfidf':
+            event_article_list = self.cosine_distance(match_dict, verbose, **metrics_params)
+        elif self.metric == 'wmd':
+            event_article_list = self.wmd(match_dict, verbose, **metrics_params)
+        else:
+            raise ValueError('Metric {} is not available. Try one of {}'.format(self.metric,
+                                                                                self.AVAILABLE_METRICS))
+        return event_article_list
+
+    def print_scores_info(self, match_dict: Dict, event_article_list: List[Dict], reverse=True):
+        article_sentences = self.text_proc.get_sentences(match_dict['article'])
+        article_sentences_text = [str(sent).replace('\n', '') for sent in article_sentences]
+        scores = sorted([(el['score'], el['event_ix'], el['sentence_ix']) for el in event_article_list],
+                        reverse=reverse)
+        for info in scores:
+            print('Score:', info[0])
+            print('Event:', match_dict['events'][info[1]])
+            print('Nearest article sentence:', article_sentences_text[info[2]])
+            print()
+
+    def get_targets_pandas(self, match_dict: Dict, league_season_teams: Optional[str] = None,
+                           **metrics_params):
+        event_article_list = self.create_match_targets(match_dict, verbose=False,
+                                                       league_season_teams=league_season_teams,
+                                                       **metrics_params)
+        pd_targets = pd.DataFrame(event_article_list)
+        return pd_targets
