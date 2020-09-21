@@ -1,58 +1,29 @@
-from scripts.text.article_text_processor import ArticleTextProcessor
-from scripts.extractive_summary.ltr.ltr_target_metrics import TargetMetrics
-from scripts.extractive_summary.ltr.ltr_features import LTRFeatures
 from scripts.experiments.experiment import Experiment
+from scripts.text.article_text_processor import ArticleTextProcessor
+from scripts.conf import TEAMS, LTR_PATH
 
-from scripts.conf import TEAMS, CSV_DATA_PATH
-
-import pandas as pd
-from tqdm import tqdm
+from abc import abstractmethod
+from typing import Dict, Optional
 import os
-from typing import Dict, List, Optional
+import pandas as pd
 import pickle
+from tqdm import tqdm
 
 
 class LearnToRank(Experiment):
-    LTR_PATH = '{}/summaries/ltr'.format(CSV_DATA_PATH)
+    """
+    Class that provides common methods for the following classes:
+    - LTRFeatures
+    - LTRTargets
+    - LTRFeaturesTargets
+    """
 
-    def __init__(self, target_metric: str, key_events: List[str], lags: List[int], metric_params: Dict,
-                 count_vec_kwargs: Optional[Dict], drop_teams: bool = False, lemma: bool = False):
-        """
-
-        :param key_events:
-        :param lags:
-        :param target_metric: metric that will be used to build the target. One of AVAILABLE_METRICS
-        :param drop_teams:
-        :param lemma:
-        """
+    def __init__(self, processor: ArticleTextProcessor):
         super().__init__()
-        self.target_metric = target_metric
-        self.processor = ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
-        self.metrics = TargetMetrics(metric=target_metric, processor=self.processor)
-        self.features = LTRFeatures(key_events=key_events, lags=lags, processor=self.processor)
-        # We store these values to be able to save different experiments
-        self.target_metric = target_metric
-        # Text processing options
-        self.drop_teams = drop_teams
-        self.lemma = lemma
-        # Features options
-        self.key_events = key_events
-        self.lags = lags
-        # Target options
-        self.metric_params = metric_params
-        # If we use want to use the same configuration when using cosine distance as score
-        self.count_vec_kwargs = self.metric_params if not count_vec_kwargs else count_vec_kwargs
+        self.processor = processor
 
     def config(self) -> Dict:
-        return {
-            'key_events': self.key_events,
-            'lags': self.lags,
-            'target_metric': self.target_metric,
-            'drop_teams': self.drop_teams,
-            'lemma': self.lemma,
-            'metric_params': self.metric_params,
-            'count_vec_kwargs': self.count_vec_kwargs
-        }
+        pass
 
     def experiment_id(self) -> str:
         experiment_hash = super().experiment_id()
@@ -60,51 +31,41 @@ class LearnToRank(Experiment):
 
     @property
     def path(self) -> str:
-        return '{}/{}'.format(self.LTR_PATH, self.experiment_id())
+        return '{}/{}/{}'.format(LTR_PATH, self.ltr_type, self.experiment_id())
 
     @property
-    def target_features_path(self) -> str:
-        return '{}/features_targets.csv'.format(self.path)
+    @abstractmethod
+    def file_path(self) -> str:
+        pass
 
     @property
-    def target_path(self) -> str:
-        return '{}/targets.csv'.format(self.path)
+    @abstractmethod
+    def ltr_type(self) -> str:
+        pass
 
     @property
     def config_path(self) -> str:
         return '{}/config.pickle'.format(self.path)
 
-    def match_target_features(self, match_dict: Dict, league_season_teams: Optional[str] = None) -> pd.DataFrame:
-        """
-        Returns a pandas dataframe containing features and targets for a match
-        :param match_dict:
-        :param league_season_teams:
-        :return:
-        """
-        target_df = self.metrics.get_targets_pandas(match_dict, league_season_teams=league_season_teams,
-                                                    **self.metric_params)
-        features_df = self.features.get_features_pandas(match_dict, league_season_teams=league_season_teams,
-                                                        **self.count_vec_kwargs)
-        match_df = features_df.join(target_df, how='inner')
-        return match_df
-
     def _match_exists(self, match_url: str) -> bool:
-        if os.path.exists(self.target_features_path):
-            pd_all = pd.read_csv(self.target_features_path)
+        if os.path.exists(self.file_path):
+            pd_all = pd.read_csv(self.file_path)
             return match_url in pd_all['url'].unique()
         else:
             return False
 
-    def _write_match(self, pd_match: pd.DataFrame):
-        if os.path.exists(self.target_features_path):
-            pd_all = pd.read_csv(self.target_features_path)
+    @staticmethod
+    def _write_match(pd_match: pd.DataFrame, path: str):
+        if os.path.exists(path):
+            pd_all = pd.read_csv(path)
             pd_all = pd.concat([pd_all, pd_match])
-            pd_all.to_csv(self.target_features_path, index=False)
+            pd_all.to_csv(path, index=False)
         else:
-            pd_match.to_csv(self.target_features_path, index=False)
+            pd_match.to_csv(path, index=False)
 
-    def _non_processed_dict(self, all_files: Dict) -> Dict:
-        pd_all = pd.read_csv(self.target_features_path) if os.path.exists(self.target_features_path) else None
+    @staticmethod
+    def _non_processed_dict(all_files: Dict, path: str) -> Dict:
+        pd_all = pd.read_csv(path) if os.path.exists(path) else None
         processed_files = 0
         seasons_to_del = list()
         urls_to_del = list()
@@ -136,34 +97,44 @@ class LearnToRank(Experiment):
             with open(self.config_path, 'wb') as fp:
                 pickle.dump(self.config(), fp)
 
-    def run_all_target_features(self):
+    def _create_directory_if_not_exists(self):
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+
+    def read(self) -> pd.DataFrame:
+        if os.path.exists(self.file_path):
+            return pd.read_csv(self.file_path)
+        else:
+            raise ValueError("{} does not exists".format(self.file_path))
+
+    def get_config(self) -> Dict:
+        if os.path.exists(self.config_path):
+            with open(self.config_path, 'rb') as fp:
+                return pickle.load(fp)
+        else:
+            raise ValueError("{} does not exists".format(self.config_path))
+
+    @abstractmethod
+    def run_match(self, match_dict: Dict, league_season_teams: Optional[str] = None) -> pd.DataFrame:
+        pass
+
+    def run_all_matches(self):
         """
-        Computes and saves a dataset containing both features and targets for all of the articles.
+        Computes and saves a dataset containing features, targets or both information for all of the articles.
         :return:
         """
+        self._create_directory_if_not_exists()
         all_files = self.processor.load_json()
-        all_files_proc = self._non_processed_dict(all_files)
+        all_files_proc = self._non_processed_dict(all_files, self.file_path)
         print('Updated all_files')
-        print('Results path in {}'.format(self.target_features_path))
+        print('Results path in {}'.format(self.file_path))
         self._write_config()
         for season_file, season_values in tqdm(all_files_proc.items()):
             print(season_file)
             self.processor.league_season_teams = TEAMS[season_file.split('.')[0]]
             for match_url, match_dict in season_values.items():
-                # if self._match_exists(match_url):
-                    # print('Match already exists')
-                    # continue
                 print(match_url)
-                match_df = self.match_target_features(match_dict)
+                match_df = self.run_match(match_dict)
                 match_df['url'] = match_url
                 match_df['json_file'] = season_file
-                self._write_match(match_df)
-        pd_all = pd.read_csv(self.target_features_path)
-        return pd_all
-
-    def read_features_targets(self):
-        if os.path.exists(self.target_features_path):
-            return pd.read_csv(self.target_features_path)
-        else:
-            raise ValueError("Features and targets have not been written yet")
-
+                self._write_match(match_df, self.file_path)

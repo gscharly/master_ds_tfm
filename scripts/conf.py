@@ -98,3 +98,5 @@ CSV_DATA_PATH = '{}/csv'.format(DATA_PATH)
 SUMMARY_PATH = CSV_DATA_PATH + '/summaries'
 ARTICLES_PATH = CSV_DATA_PATH + '/articles_events.csv'
 METRICS_PATH = DATA_PATH + '/metrics'
+
+LTR_PATH = '{}/summaries/ltr'.format(CSV_DATA_PATH)

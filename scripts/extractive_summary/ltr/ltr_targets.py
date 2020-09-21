@@ -10,23 +10,45 @@ import gensim.downloader as api
 
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.article_text_processor import ArticleTextProcessor
+from scripts.extractive_summary.ltr.learn_to_rank import LearnToRank
 
 
-class TargetMetrics:
+class LTRTargets(LearnToRank):
     """
     Class that contains metrics and distances used to build targets for a Learning to Rank algorithm.
     """
     AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'wmd']
     ROUGE_PARAMS = ['rouge_mode', 'rouge_metric']
+    LTR_TYPE = 'targets'
 
-    def __init__(self, metric: str, drop_teams: bool = False, lemma: bool = False,
+    def __init__(self, metric: str, metric_params: Dict, drop_teams: bool = False, lemma: bool = False,
                  processor: Optional[ArticleTextProcessor] = None):
         assert metric in self.AVAILABLE_METRICS, 'Available metrics: {}'.format(self.AVAILABLE_METRICS)
         print('Setting target metric to', metric)
-        self.metric = metric
-        self.text_proc = BasicTextProcessor()
         self.processor = processor if processor else ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
+        super().__init__(processor=self.processor)
+        self.metric = metric
+        self.metric_params = metric_params
+        self.text_proc = BasicTextProcessor()
+        self.drop_teams = drop_teams
+        self.lemma = lemma
 
+    def config(self) -> Dict:
+        return {
+            'target_metric': self.metric,
+            'drop_teams': self.drop_teams,
+            'lemma': self.lemma,
+            'metric_params': self.metric_params
+        }
+
+    @property
+    def ltr_type(self) -> str:
+        return self.LTR_TYPE
+
+    @property
+    def file_path(self) -> str:
+        return '{}/{}.csv'.format(self.path, self.LTR_TYPE)
+    
     def _process_events_article(self, match_dict: Dict) -> Tuple[List[str], List[str]]:
         """
         Process events and articles text.
@@ -122,27 +144,25 @@ class TargetMetrics:
                 print()
         return event_article_list
 
-    def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None,
-                             **metrics_params):
+    def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None):
         """
         Calculates the target for a match. Specific metric params can be passed.
         :param match_dict:
         :param verbose:
         :param league_season_teams:
-        :param metrics_params:
         :return:
         """
         if league_season_teams:
             self.processor.league_season_teams = league_season_teams
 
         if self.metric == 'rouge':
-            assert all(k in self.ROUGE_PARAMS for k in metrics_params.keys()),\
+            assert all(k in self.ROUGE_PARAMS for k in self.metric_params.keys()),\
                 'Rouge params are {}'.format(self.ROUGE_PARAMS)
-            event_article_list = self.rouge(match_dict, verbose, **metrics_params)
+            event_article_list = self.rouge(match_dict, verbose, **self.metric_params)
         elif self.metric == 'cosine_tfidf':
-            event_article_list = self.cosine_distance(match_dict, verbose, **metrics_params)
+            event_article_list = self.cosine_distance(match_dict, verbose, **self.metric_params)
         elif self.metric == 'wmd':
-            event_article_list = self.wmd(match_dict, verbose, **metrics_params)
+            event_article_list = self.wmd(match_dict, verbose, **self.metric_params)
         else:
             raise ValueError('Metric {} is not available. Try one of {}'.format(self.metric,
                                                                                 self.AVAILABLE_METRICS))
@@ -159,10 +179,8 @@ class TargetMetrics:
             print('Nearest article sentence:', article_sentences_text[info[2]])
             print()
 
-    def get_targets_pandas(self, match_dict: Dict, league_season_teams: Optional[str] = None,
-                           **metrics_params):
+    def run_match(self, match_dict: Dict, league_season_teams: Optional[str] = None):
         event_article_list = self.create_match_targets(match_dict, verbose=False,
-                                                       league_season_teams=league_season_teams,
-                                                       **metrics_params)
+                                                       league_season_teams=league_season_teams)
         pd_targets = pd.DataFrame(event_article_list)
         return pd_targets

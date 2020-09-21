@@ -2,6 +2,7 @@
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.article_text_processor import ArticleTextProcessor
 from scripts.extractive_summary.key_events_summary import KeyEventsSummary
+from scripts.extractive_summary.ltr.learn_to_rank import LearnToRank
 
 # sklearn stuff
 from sklearn.metrics.pairwise import cosine_similarity
@@ -16,19 +17,42 @@ from collections import OrderedDict, Counter
 import warnings
 
 
-class LTRFeatures:
+class LTRFeatures(LearnToRank):
+    LTR_TYPE = 'features'
 
-    def __init__(self, key_events: List[str], lags: List[int] = None, drop_teams: bool = False, lemma: bool = False,
-                 processor: Optional[ArticleTextProcessor] = None):
-        self.key_events_sum = KeyEventsSummary(key_events=key_events)
+    def __init__(self, key_events: List[str], count_vec_kwargs: Dict, lags: List[int] = None, drop_teams: bool = False,
+                 lemma: bool = False, processor: Optional[ArticleTextProcessor] = None):
         self.processor = processor if processor else ArticleTextProcessor(drop_teams=drop_teams, lemma=lemma)
+        super().__init__(processor=self.processor)
+
+        self.key_events_sum = KeyEventsSummary(key_events=key_events)
         self.text_proc = BasicTextProcessor()
         self.lemma = lemma
+        self.drop_teams = drop_teams
+        self.key_events = key_events
+        self.count_vec_kwargs = count_vec_kwargs
 
         if lags is None:
             self.lags = [1, 3, 5]
         else:
             self.lags = lags
+
+    def config(self) -> Dict:
+        return {
+            'key_events': self.key_events,
+            'lags': self.lags,
+            'drop_teams': self.drop_teams,
+            'lemma': self.lemma,
+            'count_vec_kwargs': self.count_vec_kwargs
+        }
+
+    @property
+    def ltr_type(self) -> str:
+        return self.LTR_TYPE
+
+    @property
+    def file_path(self) -> str:
+        return '{}/{}.csv'.format(self.path, self.LTR_TYPE)
 
     def _is_key_event(self, proc_event: List[str]) -> int:
         """
@@ -144,7 +168,7 @@ class LTRFeatures:
         n_events = sum(players_appearences.values())
         return {player_tuple[0]: player_tuple[1]/n_events for player_tuple in players_appearences.most_common()}
 
-    def _match_level_features(self, events: List[str], **count_vec_kwargs) -> Dict:
+    def _match_level_features(self, events: List[str]) -> Dict:
         """
         This function calculates and returns the following features:
         - Sum of TFIDF weights for every event
@@ -152,12 +176,11 @@ class LTRFeatures:
         - Players importances
         It also returns the processed events, so that we don't have to process them again in event level stage.
         :param events:
-        :param count_vec_kwargs:
         :return:
         """
         processed_events = [' '.join(self.processor.process_match_text(event)) for event in events]
         # TFIDF sum
-        tfidf_dict = self.text_proc.train_tfidf(processed_events, **count_vec_kwargs)
+        tfidf_dict = self.text_proc.train_tfidf(processed_events, **self.count_vec_kwargs)
         tfidf_sum_list = np.sum(tfidf_dict['x'], axis=1)
         assert len(tfidf_sum_list) == len(events), "Length of events does not match length of tfidf"
         # Similarities with lagged events
@@ -184,13 +207,12 @@ class LTRFeatures:
             all_events_feature_dict[k].append(v)
         return all_events_feature_dict
 
-    def create_features(self, match_dict: Dict, league_season_teams: Optional[str], **count_vec_kwargs) -> Dict:
+    def create_features(self, match_dict: Dict, league_season_teams: Optional[str]) -> Dict:
         """
         Create features for every event. It returns a Dict, where each key is a feature containing a list with all
         of the values for each event.
         :param match_dict:
         :param league_season_teams:
-        :param count_vec_kwargs:
         :return:
         """
         if len(match_dict['events']) == 0:
@@ -200,7 +222,7 @@ class LTRFeatures:
         if league_season_teams:
             self.processor.league_season_teams = league_season_teams
 
-        match_level_features = self._match_level_features(match_dict['events'], **count_vec_kwargs)
+        match_level_features = self._match_level_features(match_dict['events'])
 
         all_events_feature_dict = dict()
         for event_pos, event in enumerate(match_dict['events']):
@@ -213,11 +235,13 @@ class LTRFeatures:
             event_feature_dict['tfidf_sum'] = float(match_level_features['tfidf_sum'][event_pos])
             # Lagged similarity
             event_feature_dict = self._add_lags_to_event(event_feature_dict, match_level_features, event_pos)
+            # Event ix (needed for join with targets)
+            event_feature_dict['event_ix'] = event_pos
 
             all_events_feature_dict = self._update_match_dict(event_feature_dict, all_events_feature_dict)
 
         return all_events_feature_dict
 
-    def get_features_pandas(self, match_dict: Dict, league_season_teams: str, **count_vec_kwargs) -> pd.DataFrame:
-        features = self.create_features(match_dict, league_season_teams, **count_vec_kwargs)
+    def run_match(self, match_dict: Dict, league_season_teams: Optional[str] = None) -> pd.DataFrame:
+        features = self.create_features(match_dict, league_season_teams)
         return pd.DataFrame(features)
