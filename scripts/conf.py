@@ -100,3 +100,40 @@ ARTICLES_PATH = CSV_DATA_PATH + '/articles_events.csv'
 METRICS_PATH = DATA_PATH + '/metrics'
 
 LTR_PATH = '{}/summaries/ltr'.format(CSV_DATA_PATH)
+
+LEAGUE_FILES = ['premier_league_2018_2019.json', 'mls_2015_2016.json',
+               'mls_2019_2020.json', 'premier_league_2016_2017.json',
+               'italian_serie_a_2019_2020.json', 'spanish_la_liga_2019_2020.json',
+               'mls_2017_2018.json', 'premier_league_2019_2020.json',
+               'mls_2018_2019.json', 'premier_league_2017_2018.json',
+               'mls_2016_2017.json', 'italian_serie_a_2017_2018.json',
+               'french_ligue_one_2019_2020.json',
+               'german_bundesliga_2017_2018.json',
+               'german_bundesliga_2019_2020.json',
+               'german_bundesliga_2018_2019.json',
+               'spanish_la_liga_2017_2018.json', 'spanish_la_liga_2018_2019.json',
+               'champions_league_2019_2020.json',
+               'italian_serie_a_2018_2019.json']
+
+CHAMPIONS = [f for f in LEAGUE_FILES if 'champions' in f]
+FRENCH = [f for f in LEAGUE_FILES if 'french' in f]
+GERMAN = [f for f in LEAGUE_FILES if 'german' in f]
+ITALIAN = [f for f in LEAGUE_FILES if 'italian' in f]
+MLS = [f for f in LEAGUE_FILES if 'mls' in f]
+PREMIER = [f for f in LEAGUE_FILES if 'premier' in f]
+SPANISH = [f for f in LEAGUE_FILES if 'spanish' in f]
+
+LEAGUES_DICT = {
+    'champions': CHAMPIONS,
+    'france': FRENCH,
+    'germany': GERMAN,
+    'italy': ITALIAN,
+    'mls': MLS,
+    'premier': PREMIER,
+    'spain': SPANISH,
+}
+
+REVERSE_LEAGUES_DICT = dict()
+for league_name, leagues in LEAGUES_DICT.items():
+    for file_name in leagues:
+        REVERSE_LEAGUES_DICT[file_name] = league_name

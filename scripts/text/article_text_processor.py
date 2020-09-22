@@ -1,20 +1,25 @@
 # Library imports
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.teams_players import TeamPlayers
-from scripts.conf import DATA_PATH
+from scripts.conf import DATA_PATH, CSV_DATA_PATH, LEAGUES_DICT, REVERSE_LEAGUES_DICT
 
 # Other imports
 import os
 import json
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import unidecode
 from collections import Counter
 from tqdm import tqdm
 import pickle
+import pandas as pd
 
 
 class ArticleTextProcessor:
     SAVE_PATH = '{}/pickle'.format(DATA_PATH)
+    EVENTS_STATS_PATH = '{}/events_text_stats.csv'.format(CSV_DATA_PATH)
+    ARTICLES_STATS_PATH = '{}/articles_text_stats.csv'.format(CSV_DATA_PATH)
+    EVENTS_LEAGUE_STATS_PATH = '{}/events_text_stats_league.csv'.format(CSV_DATA_PATH)
+    ARTICLES_LEAGUE_STATS_PATH = '{}/articles_text_stats_league.csv'.format(CSV_DATA_PATH)
 
     def __init__(self, drop_teams: bool = False, lemma: bool = False, only_players: bool = False):
         self.text_proc = BasicTextProcessor()
@@ -164,6 +169,22 @@ class ArticleTextProcessor:
             with open(path_dict['path_files'], 'wb') as fp:
                 pickle.dump(vocab_files_dict, fp)
 
+    def build_vocab_league(self, league: str, text_type: str = 'article'):
+        """Returns a dict with the vocabulary for each article in a league"""
+        assert league in LEAGUES_DICT.keys(), "league must be one of {}".format(list(LEAGUES_DICT.keys()))
+        all_news_dict = self.load_json()
+        self.vocabulary_dict[text_type] = dict()
+        self.words[text_type] = Counter()
+        vocab_files_dict = dict()
+        for league_name, league_data in all_news_dict.items():
+            if league_name not in LEAGUES_DICT[league]:
+                continue
+            vocab_file_counter = self._build_vocab_file(league_data, text_type)
+            vocab_files_dict[league_name] = vocab_file_counter.most_common()
+            self.words[text_type].update(vocab_file_counter)
+        self.vocabulary_dict[text_type] = self.words[text_type].most_common()
+        return self.vocabulary_dict[text_type]
+
     def get_vocabulary(self, text_type: str = 'article', process: bool = False) -> List:
         path_dict = self._get_picke_paths(text_type, process)
         if not os.path.exists(path_dict['path']):
@@ -180,3 +201,102 @@ class ArticleTextProcessor:
         with open(path_dict['path_files'], 'rb') as fp:
             vocab = pickle.load(fp)
         return vocab[league_name]
+
+    def _match_text_stats(self, article_dict: Dict, text_type: str = 'article') -> Dict:
+        """
+        Returns a dict with number of words and sentences for a match text.
+        :param article_dict:
+        :param text_type:
+        :return:
+        """
+        text = article_dict[text_type]
+        if text_type == 'events':
+            n_sents = len(text)
+            text = ' '.join(text)
+        else:
+            n_sents = len([sent for sent in self.text_proc.nlp(text).sents])
+        tokens = self._basic_clean_tokens(text)
+        return {
+            'n_sents': n_sents,
+            'n_tokens': len(tokens),
+            'vocab': len(set(tokens))
+        }
+
+    def file_text_stats(self, league_data: Dict, text_type: str) -> pd.DataFrame:
+        file_dict = {url: self._match_text_stats(article_dict, text_type) for url, article_dict in league_data.items()}
+
+        pd_dict = {
+            'url': list(),
+            'n_sents': list(),
+            'n_tokens': list(),
+            'vocab': list(),
+        }
+        for url, stats_dict in file_dict.items():
+            pd_dict['url'].append(url)
+            pd_dict['n_sents'].append(stats_dict['n_sents'])
+            pd_dict['n_tokens'].append(stats_dict['n_tokens'])
+            pd_dict['vocab'].append(stats_dict['vocab'])
+        df = pd.DataFrame(pd_dict)
+        vocab_file_counter = self._build_vocab_file(league_data, text_type, process=False)
+        df['vocab_file'] = len(vocab_file_counter.most_common())
+
+        return pd.DataFrame(pd_dict)
+
+    def _update_stats_df(self, stats_df: pd.DataFrame, league_data: Dict, league_name: str, text_type: str):
+        league_df = self.file_text_stats(league_data, text_type=text_type)
+        league_df['json_file'] = league_name
+        league_df['league'] = REVERSE_LEAGUES_DICT[league_name]
+        league_df['tokens_per_sent'] = league_df['n_tokens'] / league_df['n_sents']
+        return pd.concat([stats_df, league_df])
+
+    def text_stats(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Returns 2 dataframes with text stats, one for events and the other for articles.
+        :return:
+        """
+        if os.path.exists(self.EVENTS_STATS_PATH) and os.path.exists(self.ARTICLES_STATS_PATH):
+            events_df = pd.read_csv(self.EVENTS_STATS_PATH)
+            article_df = pd.read_csv(self.ARTICLES_STATS_PATH)
+            return events_df, article_df
+        else:
+            all_news_dict = self.load_json()
+            events_df = pd.DataFrame()
+            article_df = pd.DataFrame()
+            for league_name, league_data in tqdm(all_news_dict.items()):
+                events_df = self._update_stats_df(events_df, league_data, league_name, 'events')
+                article_df = self._update_stats_df(article_df, league_data, league_name, 'article')
+            events_df.to_csv(self.EVENTS_STATS_PATH, index=False)
+            article_df.to_csv(self.ARTICLES_STATS_PATH, index=False)
+            return events_df, article_df
+
+    def text_stats_leagues(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Returns 2 dataframes with text stats, one for events and the other for articles.
+        :return:
+        """
+        if os.path.exists(self.EVENTS_LEAGUE_STATS_PATH) and os.path.exists(self.ARTICLES_LEAGUE_STATS_PATH):
+            events_df = pd.read_csv(self.EVENTS_LEAGUE_STATS_PATH)
+            article_df = pd.read_csv(self.ARTICLES_LEAGUE_STATS_PATH)
+            return events_df, article_df
+        else:
+            # TODO feo
+            events_dict = {
+                'league': list(),
+                'vocab': list()
+            }
+            article_dict = {
+                'league': list(),
+                'vocab': list()
+            }
+            for league in tqdm(LEAGUES_DICT.keys()):
+                events_dict['league'].append(league)
+                events_dict['vocab'].append(len(self.build_vocab_league(league, text_type='events')))
+                article_dict['league'].append(league)
+                article_dict['vocab'].append(len(self.build_vocab_league(league, text_type='article')))
+
+            events_df = pd.DataFrame(events_dict)
+            article_df = pd.DataFrame(article_dict)
+
+            events_df.to_csv(self.EVENTS_LEAGUE_STATS_PATH, index=False)
+            article_df.to_csv(self.ARTICLES_LEAGUE_STATS_PATH, index=False)
+            return events_df, article_df
