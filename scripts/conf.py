@@ -90,7 +90,7 @@ TEAMS = {
 }
 
 EN_LABELS = {
-    'PLAYER': ['PERSON'],
+    'PLAYER': ['PERSON', 'ORG'],
     'TEAM': ['ORG', 'GPE', 'PERSON', 'CARDINAL', 'NORP', 'EVENT', 'FAC', 'LOC']
 }
 CSV_DATA_PATH = '{}/csv'.format(DATA_PATH)
