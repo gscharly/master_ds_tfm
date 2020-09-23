@@ -42,9 +42,14 @@ class KeyEvents:
 
         # Train tfidf with article sentences
         vectorizer = CountVectorizer(**count_vec_kwargs)
-        x = vectorizer.fit_transform(processed_article_sentences).toarray()
-        tfidfconverter = TfidfTransformer()
-        x = tfidfconverter.fit_transform(x).toarray()
+        try:
+            x = vectorizer.fit_transform(processed_article_sentences).toarray()
+            tfidfconverter = TfidfTransformer()
+            x = tfidfconverter.fit_transform(x).toarray()
+        except ValueError:
+            warnings.warn('Could not perform tfidf')
+            return dict()
+
         # Events
         x_events = vectorizer.transform(summary_events)
         x_events = tfidfconverter.transform(x_events).toarray()

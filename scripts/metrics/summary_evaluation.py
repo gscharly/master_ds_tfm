@@ -116,19 +116,6 @@ class SummaryEvaluation:
                 pickle.dump(avg_scores_dict, fp)
             return scores_dict, avg_scores_dict
 
-    def output_avg_metrics(self) -> Dict:
-        """
-        Returns a dictionary with the average scores for every experiment
-        :return:
-        """
-        results_path = '{}/summaries/{}'.format(conf.METRICS_PATH, self.metric)
-        only_files = [f for f in listdir(results_path) if isfile(join(results_path, f)) and 'avg' in f]
-        all_scores_dict = dict()
-        for f in only_files:
-            with open(join(results_path, f), 'rb') as fp:
-                all_scores_dict[f] = pickle.load(fp)
-        return all_scores_dict
-
     def evaluate_all_summaries(self, preprocess_text: bool = False):
         """
         Performs evaluation for every summary file
@@ -160,3 +147,64 @@ class SummaryEvaluation:
         pd_matches = pd.read_csv(conf.ARTICLES_PATH)
         results_path = '{}/summaries/{}/upper_bound'.format(conf.METRICS_PATH, self.metric)
         _ = self.evaluate(pd_matches, results_path, preprocess_text=preprocess_text, summary_key='events')
+
+    @staticmethod
+    def _exp_metrics_avg(scores_dict: Dict) -> pd.DataFrame:
+        pd_dict = {
+            'metric': list(),
+            'metric_type': list(),
+            'value': list()
+        }
+        for metric, metric_dict in scores_dict.items():
+            for metric_type, metric_value in metric_dict.items():
+                pd_dict['metric'].append(metric)
+                pd_dict['metric_type'].append(metric_type)
+                pd_dict['value'].append(metric_value)
+        return pd.DataFrame(pd_dict)
+
+    @staticmethod
+    def _exp_metrics(scores_dict: Dict) -> pd.DataFrame:
+        pd_dict = {
+            'metric': list(),
+            'metric_type': list(),
+            'value': list(),
+            'json_file': list(),
+            'url': list()
+        }
+
+        for league_file, league_dict in scores_dict.items():
+            for url, match_scores_list in league_dict.items():
+                match_scores_dict = match_scores_list[0]
+                for metric, metric_dict in match_scores_dict.items():
+                    for metric_type, metric_value in metric_dict.items():
+                        pd_dict['metric'].append(metric)
+                        pd_dict['metric_type'].append(metric_type)
+                        pd_dict['value'].append(metric_value)
+                        pd_dict['json_file'].append(league_file)
+                        pd_dict['url'].append(url)
+        return pd.DataFrame(pd_dict)
+
+    def experiment_metrics_pandas(self, path: str, avg: bool) -> pd.DataFrame:
+        with open(path, 'rb') as fp:
+            scores_dict = pickle.load(fp)
+        if avg:
+            return self._exp_metrics_avg(scores_dict)
+        else:
+            return self._exp_metrics(scores_dict)
+
+    def output_avg_metrics(self) -> pd.DataFrame:
+        """
+        Returns a dictionary with the average scores for every experiment
+        :return:
+        """
+        results_path = '{}/summaries/{}'.format(conf.METRICS_PATH, self.metric)
+        only_files = [f for f in listdir(results_path) if isfile(join(results_path, f)) and 'avg' in f]
+        all_scores_df = pd.DataFrame()
+        for f in only_files:
+            file_score_df = self.experiment_metrics_pandas(f, avg=True)
+            file_score_df['experiment'] = f.split('.')[0]
+            all_scores_df = pd.concat([all_scores_df, file_score_df])
+        return all_scores_df
+
+
+
