@@ -15,6 +15,7 @@ import pandas as pd
 from typing import Dict, List, Optional
 from collections import OrderedDict, Counter
 import warnings
+import os
 
 
 class LTRFeatures(LearnToRank):
@@ -245,3 +246,12 @@ class LTRFeatures(LearnToRank):
     def run_match(self, match_dict: Dict, league_season_teams: Optional[str] = None) -> pd.DataFrame:
         features = self.create_features(match_dict, league_season_teams)
         return pd.DataFrame(features)
+
+    def get_features(self):
+        if not os.path.exists(self.file_path):
+            print('{} does not exists'.format(self.file_path))
+            print('Executing features')
+            # self.features.run_all_matches()
+        else:
+            print('Reading features from {}'.format(self.file_path))
+        return self.read()

@@ -7,6 +7,7 @@ from sklearn.pipeline import Pipeline
 import numpy as np
 import pandas as pd
 import gensim.downloader as api
+import os
 
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.article_text_processor import ArticleTextProcessor
@@ -184,3 +185,12 @@ class LTRTargets(LearnToRank):
                                                        league_season_teams=league_season_teams)
         pd_targets = pd.DataFrame(event_article_list)
         return pd_targets
+
+    def get_targets(self) -> pd.DataFrame:
+        if not os.path.exists(self.file_path):
+            print('{} does not exists'.format(self.file_path))
+            print('Executing targets')
+            # self.targets.run_all_matches()
+        else:
+            print('Reading targets from {}'.format(self.file_path))
+        return self.read()

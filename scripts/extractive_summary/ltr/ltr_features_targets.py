@@ -71,32 +71,23 @@ class LTRFeaturesTargets(LearnToRank):
         match_df = features_df.join(target_df, how='inner')
         return match_df
 
-    def _get_targets(self) -> pd.DataFrame:
-        if not os.path.exists(self.targets.file_path):
-            print('{} does not exists'.format(self.targets.file_path))
-            print('Executing targets')
-            # self.targets.run_all_matches()
-        else:
-            print('Reading targets from {}'.format(self.targets.file_path))
-        return self.targets.read()
-
-    def _get_features(self):
-        if not os.path.exists(self.features.file_path):
-            print('{} does not exists'.format(self.features.file_path))
-            print('Executing features')
-            # self.features.run_all_matches()
-        else:
-            print('Reading features from {}'.format(self.features.file_path))
-        return self.features.read()
-
     def run_target_features(self):
         """
         Computes and saves a dataset containing both features and targets for all of the articles. It first checks
         whether features and targets with the configuration are already created.
         :return:
         """
-        targets = self._get_targets()
-        features = self._get_features()
+        targets = self.targets.get_targets()
+        features = self.features.get_features()
         pd_all = features.merge(targets, on=['url', 'json_file', 'event_ix'], how='inner')
         self._write_config()
-        return pd_all
+        pd_all.to_csv(self.file_path, index=False)
+
+    def get_features_targets(self) -> pd.DataFrame:
+        if not os.path.exists(self.file_path):
+            print('{} does not exists'.format(self.file_path))
+            print('Executing features and targets')
+            self.run_target_features()
+        else:
+            print('Reading features and targets from {}'.format(self.file_path))
+        return self.read()

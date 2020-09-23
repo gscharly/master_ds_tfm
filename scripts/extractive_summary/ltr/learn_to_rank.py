@@ -92,6 +92,7 @@ class LearnToRank(Experiment):
         return all_files
 
     def _write_config(self):
+        self._create_directory_if_not_exists()
         if not os.path.exists(self.config_path):
             print('Writing config in {}'.format(self.config_path))
             with open(self.config_path, 'wb') as fp:
