@@ -206,5 +206,11 @@ class SummaryEvaluation:
             all_scores_df = pd.concat([all_scores_df, file_score_df])
         return all_scores_df
 
+    def output_avg_bound(self) -> pd.DataFrame:
+        path = '{}/summaries/{}/upper_bound_avg.pickle'.format(conf.METRICS_PATH, self.metric)
+        with open(path, 'rb') as fp:
+            scores_dict = pickle.load(fp)
+        return self._exp_metrics_avg(scores_dict)
+
 
 
