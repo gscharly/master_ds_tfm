@@ -201,8 +201,8 @@ class SummaryEvaluation:
         only_files = [f for f in listdir(results_path) if isfile(join(results_path, f)) and 'avg' in f]
         all_scores_df = pd.DataFrame()
         for f in only_files:
-            file_score_df = self.experiment_metrics_pandas(f, avg=True)
-            file_score_df['experiment'] = f.split('.')[0]
+            file_score_df = self.experiment_metrics_pandas(join(results_path, f), avg=True)
+            file_score_df['experiment'] = f.split('.')[0][:-4]
             all_scores_df = pd.concat([all_scores_df, file_score_df])
         return all_scores_df
 
