@@ -1,6 +1,7 @@
 from scripts.experiments.experiment import Experiment
 from scripts.text.article_text_processor import ArticleTextProcessor
 from scripts.conf import TEAMS, LTR_PATH
+import scripts.utils.ml_utils as ml_utils
 
 from abc import abstractmethod
 from typing import Dict, Optional
@@ -17,6 +18,7 @@ class LearnToRank(Experiment):
     - LTRTargets
     - LTRFeaturesTargets
     """
+    SEED = 10
 
     def __init__(self, processor: ArticleTextProcessor):
         super().__init__()
@@ -46,6 +48,18 @@ class LearnToRank(Experiment):
     @property
     def config_path(self) -> str:
         return '{}/config.pickle'.format(self.path)
+
+    @property
+    def train_path(self) -> str:
+        return '{}/{}/{}/train.csv'.format(LTR_PATH, self.ltr_type, self.experiment_id())
+
+    @property
+    def val_path(self) -> str:
+        return '{}/{}/{}/validation.csv'.format(LTR_PATH, self.ltr_type, self.experiment_id())
+
+    @property
+    def test_path(self) -> str:
+        return '{}/{}/{}/test.csv'.format(LTR_PATH, self.ltr_type, self.experiment_id())
 
     def _match_exists(self, match_url: str) -> bool:
         if os.path.exists(self.file_path):
@@ -139,3 +153,32 @@ class LearnToRank(Experiment):
                 match_df['url'] = match_url
                 match_df['json_file'] = season_file
                 self._write_match(match_df, self.file_path)
+
+    def train_val_test_split(self, train_perc: float, val_perc: float):
+        pd_df = self.read()
+        if not (os.path.exists(self.train_path) and os.path.exists(self.val_path) and os.path.exists(self.test_path)):
+            train, val, test = ml_utils.train_validate_test_split(pd_df, train_percent=train_perc,
+                                                                  validate_percent=val_perc,
+                                                                  seed=self.SEED)
+            if not os.path.exists(self.train_path):
+                train.to_csv(self.train_path, index=False)
+
+            if not os.path.exists(self.val_path):
+                val.to_csv(self.val_path, index=False)
+
+            if not os.path.exists(self.test_path):
+                test.to_csv(self.test_path, index=False)
+        else:
+            print('Train, val and test data are already written')
+
+    def read_train(self):
+        print("Reading", self.train_path)
+        return pd.read_csv(self.train_path)
+
+    def read_validation(self):
+        print("Reading", self.val_path)
+        return pd.read_csv(self.val_path)
+
+    def read_test(self):
+        print("Reading", self.test_path)
+        return pd.read_csv(self.test_path)
