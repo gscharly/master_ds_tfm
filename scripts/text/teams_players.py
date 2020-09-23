@@ -3,7 +3,7 @@ Generation of players and teams dataset from the articles and events files.
 """
 
 from scripts.text.basic_text_processor import BasicTextProcessor
-from scripts.conf import TEAMS, EN_LABELS
+from scripts.conf import TEAMS, EN_LABELS, CSV_DATA_PATH
 from typing import List, Tuple, Dict
 from collections import Counter
 from operator import add
@@ -17,6 +17,8 @@ BANNED_CHARS = ['(', 'replaces', 'goal', 'Yellow']
 
 
 class TeamPlayers:
+    PATH = '{}/players_teams.csv'.format(CSV_DATA_PATH)
+
     def __init__(self):
         self.text_proc = BasicTextProcessor()
         self.players_set = set()
@@ -284,4 +286,7 @@ class TeamPlayers:
             print(pd_df_season.head())
             list_df.append(pd_df_season)
         pd_all = reduce(lambda df1, df2: pd.concat([df1, df2]), list_df)
-        pd_all.to_csv('{}/data/csv/players_teams.csv'.format(MAIN_PATH))
+        pd_all.to_csv(self.PATH, index=False)
+
+    def read(self) -> pd.DataFrame:
+        return pd.read_csv(self.PATH)
