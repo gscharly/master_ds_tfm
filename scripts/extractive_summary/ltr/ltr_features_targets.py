@@ -81,6 +81,7 @@ class LTRFeaturesTargets(LearnToRank):
         features = self.features.get_features()
         pd_all = features.merge(targets, on=['url', 'json_file', 'event_ix'], how='inner')
         self._write_config()
+        print('Writing to', self.file_path)
         pd_all.to_csv(self.file_path, index=False)
 
     def get_features_targets(self) -> pd.DataFrame:
