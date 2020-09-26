@@ -251,7 +251,7 @@ class LTRFeatures(LearnToRank):
         if not os.path.exists(self.file_path):
             print('{} does not exists'.format(self.file_path))
             print('Executing features')
-            # self.features.run_all_matches()
+            self.run_all_matches()
         else:
             print('Reading features from {}'.format(self.file_path))
         return self.read()

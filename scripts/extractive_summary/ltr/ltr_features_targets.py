@@ -77,6 +77,9 @@ class LTRFeaturesTargets(LearnToRank):
         whether features and targets with the configuration are already created.
         :return:
         """
+        if os.path.exists(self.file_path):
+            print('{} already exists'.format(self.file_path))
+            return
         targets = self.targets.get_targets()
         features = self.features.get_features()
         pd_all = features.merge(targets, on=['url', 'json_file', 'event_ix'], how='inner')
