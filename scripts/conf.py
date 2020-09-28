@@ -1,5 +1,6 @@
 # Creating dataframe
 DATA_PATH = '/home/carlos/MasterDS/tfm/data'
+MODELS_PATH = '/home/carlos/MasterDS/tfm/models'
 
 LITERAL_TO_LEAGUE = {
     'premier': 'premier_league',
