@@ -81,7 +81,7 @@ class LTRTrain(TrainExperiment):
         df_sel = df[self.features + [self.target_col]].copy()
         return df_sel
 
-    def pipeline(self):
+    def pipeline(self) -> Pipeline:
         """Define the model's pipeline"""
         # Dummy cat features
         cat_pipeline = Pipeline(steps=[

@@ -38,12 +38,18 @@ class TrainExperiment(Experiment):
     def model_path(self) -> str:
         return '{}/ckpt.pickle'.format(self.path)
 
+    def read_model(self) -> Pipeline:
+        return pickle.load(open(self.model_path, 'rb'))
+
     @property
     def model_info_path(self) -> str:
         return '{}/model_info.pickle'.format(self.path)
 
+    def read_model_info(self) -> Dict:
+        return pickle.load(open(self.model_info_path, 'rb'))
+
     @abstractmethod
-    def pipeline(self):
+    def pipeline(self) -> Pipeline:
         """Define the model's pipeline"""
         pass
 
