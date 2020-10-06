@@ -9,3 +9,6 @@ analysis/.ipynb_checkpoints/*.ipynb
 summaries.txt
 *.pyc
 *.pickle
+.Rproj.user
+*.Rproj
+.Rhistory

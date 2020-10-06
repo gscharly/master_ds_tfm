@@ -1,0 +1,188 @@
+---
+title: "ltr_beinf"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r python_setup, message=FALSE}
+library(reticulate)
+use_python("/home/carlos/anaconda3/envs/tfm/bin/python", required = TRUE)
+use_condaenv("tfm", required = TRUE)
+import_from_path("scripts", path="/home/carlos/MasterDS/tfm/")
+source_python("../../../scripts/models/ltr_beinf/train.py")
+```
+```{r libraries, message=FALSE}
+library(Hmisc)
+library(gamlss)
+library(ggplot2)
+library(MLmetrics)
+library(dplyr)
+```
+
+
+
+# Modelo BEINF
+Se realiza este modelo en R usando Python, puesto que en sklearn no está disponible el tipo de modelo que se quiere usar.
+
+## Configuración
+```{python train_params}
+ltr_params = {
+    'key_events': ['goal', 'red_card', 'penalty'],
+    'lags': [1, 3, 5],
+    'target_metric': 'rouge',
+    'drop_teams': True,
+    'lemma': True,
+    'metric_params': {'rouge_mode': 'rouge-1', 'rouge_metric': 'r'},
+    'count_vec_kwargs': {'ngram_range': (1, 2), 'strip_accents': 'unicode'}
+}
+cat_features_dict = {'is_key_event': [0, 1]}
+num_features = ['tfidf_sum']
+model_params = {
+    'mu': 0.12,
+    'sigma': 0.13,
+    'nu': 0.461,
+    'tau': 0.009
+}
+
+```
+
+
+## Carga de datos y procesado
+
+```{python}
+ltr_train = LTRTrain(cat_features_dict=cat_features_dict, num_features=num_features,
+                     model_params=model_params, ltr_params=ltr_params)
+
+df_train = ltr_train.train_data()
+df_train_proc = ltr_train.preprocess_data(df_train)
+```
+
+```{r}
+train <- py$df_train_proc
+train
+```
+
+```{r}
+train$is_key_event = factor(train$is_key_event, levels=c("0","1"))
+train %>% describe()
+```
+
+## Entrenamiento
+Se pueden estimar los 4 parámetros de la distribución en función de los predictores. Estimaremos la media y la varianza, puesto que los otros dos parámetros
+serán fijos y dependerán del porcentaje de 0s y 1s que haya en nuestro conjunto de entrenamiento.
+
+```{r train}
+model <- gamlss(score~., sigma.formula = score~., nu.formula = score~., tau.formula = score~., family=BEINF, data=train)
+```
+
+```{r summary}
+summary(model)
+```
+
+__Significancia__
+
+```{r}
+drop1(object=model, parallel="multicore", ncpus=4)
+```
+__Residuos__
+
+```{r}
+plot(model)
+```
+
+
+```{r residuals}
+d <- data.frame(resids = model$residuals)
+ggplot(data=d, aes(x=resids)) + geom_histogram()
+ggplot(data=d, aes(sample=resids)) + stat_qq() + stat_qq_line() + labs(title='qq-plot residuals')
+```
+
+
+```{r}
+train_predictions <- predictAll(model, type='response')
+```
+
+
+```{r}
+# Solo sirve para comparar modelos
+GAIC(model)
+```
+__Probabilidaes de 0/1__
+
+```{r}
+p0 <- train_predictions$nu/(train_predictions$nu + train_predictions$tau + 1)
+p1 <- train_predictions$tau/(train_predictions$nu + train_predictions$tau + 1)
+```
+
+
+
+## Métricas sobre train y validation
+
+```{python save_metrics_function}
+import pickle
+import os
+
+def save_metrics(ltr_train, data_type):
+    metrics = {
+        'mu': r.mu_list,
+        'p0': r.p0_list,
+        'p1': r.p1_list
+    }
+    if not os.path.exists(ltr_train.path):
+        os.makedirs(ltr_train.path)
+    path_2_write = '{}/beinf_{}.pickle'.format(ltr_train.path, data_type)
+    print('Writing to', path_2_write)
+    pickle.dump(metrics, open(path_2_write, 'wb'))
+```
+
+__Train__
+
+```{r}
+# No funciona dentro de función, hay que hacerlo para cada caso
+train_predictions <- predictAll(model, type='response')
+mu_list <- r_to_py(train_predictions$mu)
+p0 <- train_predictions$nu/(train_predictions$nu + train_predictions$tau + 1)
+p1 <- train_predictions$tau/(train_predictions$nu + train_predictions$tau + 1)
+p0_list <- r_to_py(p0)
+p1_list <- r_to_py(p1)
+```
+
+```{python save_train_metrics}
+save_metrics(ltr_train, 'train')
+```
+__Validation__
+
+```{python load_validation}
+df_val = ltr_train.ltr.read_validation()
+df_val_proc = ltr_train.preprocess_data(df_val)
+```
+
+```{r validation_metrics}
+validation <- py$df_val_proc %>% select(-score)
+validation$is_key_event = factor(validation$is_key_event, levels=c("0","1"))
+validation_predictions <- predictAll(model, type='response', newdata=validation)
+mu_list <- r_to_py(validation_predictions$mu)
+p0 <- validation_predictions$nu/(validation_predictions$nu + validation_predictions$tau + 1)
+p1 <- validation_predictions$tau/(validation_predictions$nu + validation_predictions$tau + 1)
+p0_list <- r_to_py(p0)
+p1_list <- r_to_py(p1)
+```
+
+
+
+```{python save_validation_metrics}
+save_metrics(ltr_train, 'validation')
+```
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,55 @@
+---
+title: "beta"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(gamlss.dist)
+```
+
+
+# Distribuciones beta infladas
+El objetivo de este md es explorar las opciones de la distribución beta inflated (beta inflada) para aplicarla
+en nuestro problema.
+
+Parámetros:
+
+- $/mu$=a/(a+b)
+- $/sigma$=1/(a+b+1)
+- $/nu$=p0/p2
+- $/tau$=p1/p2
+p2 = 1-p0-p1
+
+
+## Distribución beta
+
+```{r}
+curve(dBE(x, mu =.12, sigma=0.13),  0.01, 0.999, main="BE")
+```
+
+
+
+
+```{r}
+op<-par(mfrow=c(2,2)) 
+plotBEINF(mu =.12 , sigma=.13, nu = 0.461, tau = 0.009, from = 0, to=1, n = 101, main="BEINF")
+plotBEINF0( mu =.5 , sigma=.5, nu = 0.5,  from = 0, to=1, n = 101, main="BEINF0")
+plotBEINF1( mu =.5 , sigma=.5, nu = 0.5,  from = 0.001, to=1, n = 101, main="BEINF1")
+curve(dBE(x, mu =.2, sigma=.5),  0.01, 0.999, main="BE")
+par(op)
+```
+
+```{r}
+op<-par(mfrow=c(2,2)) 
+hist(rBEINF(200, mu=.12 ,sigma=.13, nu = 0.461, tau = 0.009))
+hist(rBEINF0(200, mu=.12 ,sigma=.13, nu = 0.461))
+hist(rBEINF1(200, mu=.12 ,sigma=.13, nu = 0.009))
+hist(rBE(200, mu=.12 ,sigma=.13))
+par(op)
+```
+
