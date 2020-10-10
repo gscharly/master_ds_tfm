@@ -9,7 +9,7 @@ import pandas as pd
 from typing import List, Dict, Optional
 
 
-class LTRTrain(TrainExperiment):
+class LTRBEINFTrain(TrainExperiment):
     MODEL_TYPE = 'ltr_beinf'
     TARGET_COL = 'score'
     RANDOM_SEED = 10

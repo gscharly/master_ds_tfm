@@ -53,8 +53,8 @@ model_params = {
 ## Carga de datos y procesado
 
 ```{python}
-ltr_train = LTRTrain(cat_features_dict=cat_features_dict, num_features=num_features,
-                     model_params=model_params, ltr_params=ltr_params)
+ltr_train = LTRBEINFTrain(cat_features_dict=cat_features_dict, num_features=num_features,
+                          model_params=model_params, ltr_params=ltr_params)
 
 df_train = ltr_train.train_data()
 df_train_proc = ltr_train.preprocess_data(df_train)
