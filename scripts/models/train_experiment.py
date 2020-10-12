@@ -8,15 +8,23 @@ from sklearn.pipeline import Pipeline
 
 # Other imports
 from abc import abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 import pickle
 import os
 
 
 class TrainExperiment(Experiment):
-    def __init__(self, cv: int):
+    def __init__(self, cat_features_dict: Dict[str, List], num_features: List[str], model_params: Dict,
+                 opt_metric: Optional[str] = None, cv: int = 0):
         super().__init__()
+        self.cat_features_dict = cat_features_dict
+        self.cat_features = list(cat_features_dict.keys())
+        self.num_features = num_features
+        self.features = self.cat_features + self.num_features
+        self.model_params = model_params
+        # CV settings
         self.cv = cv
+        self.opt_metric = opt_metric
 
     def config(self) -> Dict:
         pass

@@ -6,7 +6,7 @@ from scripts.extractive_summary.ltr.ltr_features_targets import LTRFeaturesTarge
 import pandas as pd
 
 # Other
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 
 class LTRBEINFTrain(TrainExperiment):
@@ -15,19 +15,10 @@ class LTRBEINFTrain(TrainExperiment):
     RANDOM_SEED = 10
     N_JOBS = 5
 
-    def __init__(self, cat_features_dict: Dict[str, List], num_features: List[str], model_params: Dict,
-                 ltr_params: Dict, opt_metric: Optional[str] = None, cv: int = 0):
-        super().__init__(cv=cv)
-        self.cat_features_dict = cat_features_dict
-        self.cat_features = list(cat_features_dict.keys())
-        self.num_features = num_features
-        self.features = self.cat_features + self.num_features
-        self.model_params = model_params
+    def __init__(self, ltr_params: Dict, **train_exp_params):
+        super().__init__(**train_exp_params)
         self.ltr_params = ltr_params
         self.ltr = LTRFeaturesTargets(**ltr_params)
-        # CV settings
-        self.cv = cv
-        self.opt_metric = opt_metric
 
     def config(self) -> Dict:
         config_dict = {
