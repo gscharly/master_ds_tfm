@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, \
-    confusion_matrix
+    confusion_matrix, balanced_accuracy_score, mean_squared_error, mean_absolute_error, r2_score
 from sklearn.exceptions import UndefinedMetricWarning
 
 from typing import Dict, Tuple
@@ -41,6 +41,7 @@ def class_metrics_for_ths(y_true: np.array, y_pred_scores: np.array, lim_ths: Tu
     y_pred_ths = [predict_label(y_pred_scores, th) for th in metrics_th]
     return {
         'accuracy': [accuracy_score(y_true, y_pred) for y_pred in y_pred_ths],
+        'balanced_accuracy': [balanced_accuracy_score(y_true, y_pred) for y_pred in y_pred_ths],
         'precision': [precision_score(y_true, y_pred) for y_pred in y_pred_ths],
         'recall': [recall_score(y_true, y_pred) for y_pred in y_pred_ths],
         'f1': [f1_score(y_true, y_pred) for y_pred in y_pred_ths],
@@ -52,12 +53,14 @@ def class_metrics_for_ths(y_true: np.array, y_pred_scores: np.array, lim_ths: Tu
     }
 
 
-def class_metrics(y_true: np.array, y_pred: np.array) -> Dict:
+def class_metrics(y_true: np.array, y_pred: np.array, y_pred_scores: np.array) -> Dict:
     return {
         'accuracy': accuracy_score(y_true, y_pred),
+        'balanced_accuracy': balanced_accuracy_score(y_true, y_pred),
         'precision': precision_score(y_true, y_pred),
         'recall': recall_score(y_true, y_pred),
         'f1': f1_score(y_true, y_pred),
+        'roc_auc': roc_auc_score(y_true, y_pred_scores),
         'conf_matrix': confusion_matrix(y_true, y_pred)
     }
 
@@ -83,3 +86,14 @@ def label_df_with_th(df: pd.DataFrame, th: float, score_col: str):
     """
     df['y_pred_class'] = df[score_col].apply(lambda score: 1 if score >= th else 0)
     return df
+
+
+def regression_metrics(y_true: np.array, y_pred: np.array) -> Dict:
+    return {
+        'mse': mean_squared_error(y_true, y_pred),
+        'mae': mean_absolute_error(y_true, y_pred),
+        'r2': r2_score(y_true, y_pred),
+        'y_true': y_true,
+        'y_pred': y_pred,
+        'error': y_true - y_pred
+    }
