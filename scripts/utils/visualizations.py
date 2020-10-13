@@ -58,9 +58,9 @@ def classification_plots(df: pd.DataFrame, int_class: int):
 
     fig, ax = plt.subplots()
     df_aux_0 = df[df[label] == 0]
-    ax.hist(df_aux_0['p0'], bins=20, label='0')
+    ax.hist(df_aux_0[p], bins=20, label='0')
     df_aux_1 = df[df[label] == 1]
-    ax.hist(df_aux_1['p0'], bins=20, label='1')
+    ax.hist(df_aux_1[p], bins=20, label='1')
     ax.set_title(f'Histograma {p} en función de clase')
     ax.legend()
     plt.show()
@@ -85,7 +85,7 @@ def plot_roc_auc(fpr: np.array, tpr: np.array, roc_auc: float, ths: Optional[np.
 
 def plot_metrics_ths(metrics_dict: Dict, width: int, height: int, th: Optional[float] = None):
     ncols = 2
-    nrows = 2
+    nrows = 3
     fig, axs = plt.subplots(nrows, ncols, figsize=(width, height))
     y = 0
     for metric in conf.CLASS_METRICS_TO_PLOT:
@@ -112,6 +112,29 @@ def classification_metrics_th(metrics_dict: Dict, th: Optional[float] = None, wi
     # ROC AUC plot
     plot_roc_auc(metrics_dict['fpr'], metrics_dict['tpr'], metrics_dict['roc_auc'], ths=metrics_dict['roc_ths'],
                  opt_th=th)
+
+
+def plot_regression_metrics(metrics: Dict):
+    metrics_list = ['mse', 'mae', 'r2']
+    # Print metrics
+    for m in metrics_list:
+        print(m, ':', metrics[m])
+    # Plot distributions
+    to_plot = ['y_true', 'y_pred']
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    for t_plot in to_plot:
+        axs[0].hist(metrics[t_plot], bins=20, label=t_plot)
+    axs[0].legend()
+
+    for t_plot in to_plot:
+        sns.kdeplot(metrics[t_plot], ax=axs[1], label=t_plot)
+    axs[1].legend()
+    plt.plot()
+
+    sns.displot(metrics['error'], bins=20)
+    plt.title('error')
+    plt.show()
 
 
 

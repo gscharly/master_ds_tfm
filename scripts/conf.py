@@ -140,5 +140,5 @@ for league_name, leagues in LEAGUES_DICT.items():
         REVERSE_LEAGUES_DICT[file_name] = league_name
 
 # We may want to add more metrics but we may not want to plot them
-CLASS_METRICS = ['accuracy', 'recall', 'precision', 'f1']
+CLASS_METRICS = ['accuracy', 'balanced_accuracy', 'recall', 'precision', 'f1']
 CLASS_METRICS_TO_PLOT = CLASS_METRICS

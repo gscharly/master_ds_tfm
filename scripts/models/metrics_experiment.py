@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import Dict
+import pickle
 
 
 class MetricsExperiment:
@@ -18,9 +19,15 @@ class MetricsExperiment:
         """Computes a dictionary with metrics"""
         pass
 
+    @property
     @abstractmethod
-    def persist_metrics(self, metrics: Dict, data_type: str):
+    def metrics_path(self):
         pass
+
+    def persist_metrics(self, metrics: Dict, data_type: str):
+        path_2_write = self.metrics_path[data_type]
+        print('Writing metrics to', path_2_write)
+        pickle.dump(metrics, open(path_2_write, 'wb'))
 
     def run_metric(self, data_type: str):
         """Calculates and persists metrics for a given dataset type"""

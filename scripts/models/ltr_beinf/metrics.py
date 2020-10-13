@@ -11,6 +11,7 @@ import pandas as pd
 # Other imports
 import pickle
 from typing import Dict, Tuple
+import os
 
 
 class LTRBEINFMetrics(MetricsExperiment):
@@ -18,15 +19,28 @@ class LTRBEINFMetrics(MetricsExperiment):
     Class that computes metrics for LTR BEINF models. Note that these models are trained in R; this module will
     load and use the predictions of the model from R
     """
-    def __init__(self, train_exp: LTRBEINFTrain):
+    def __init__(self, train_exp: LTRBEINFTrain, class_metric_dict: Dict):
+        """
+
+        :param train_exp: train object
+        :param class_metric_dict: dictionary containing the metric to optimize in the classification problems and
+        optionally the th for each class
+        """
         super().__init__()
         self.train_exp = train_exp
+        self.class_metric_dict = class_metric_dict
+        # Paths
         self.BEINF_PATHS = self._path_dict('beinf')
         self.TH_METRICS_PATH = self._path_dict('th_metrics')
         self.CLASS_METRICS_PATH = self._path_dict('class_metrics')
+        self.METRICS_PATH = self._path_dict('metrics')
 
     def _path_dict(self, name: str):
         return {data_type: f'{self.train_exp.path}/{data_type}_{name}.pickle' for data_type in self.DATA_TYPES}
+
+    @property
+    def metrics_path(self):
+        return self.METRICS_PATH
 
     def _persist_class_metrics(self, int_class: int, metrics: Dict, data_type: str):
         path_2_write = self.CLASS_METRICS_PATH[data_type]
@@ -85,6 +99,13 @@ class LTRBEINFMetrics(MetricsExperiment):
         else:
             return self.train_exp.ltr.read_test()
 
+    def _join_data_predictions(self, data_type: str) -> pd.DataFrame:
+        # Join scores and predictions
+        df = self._load_data(data_type)
+        predictions_df = self.read_predictions(data_type)
+        df_all = df.join(predictions_df)
+        return df_all
+
     def _label_data(self, data_type: str, int_class: int) -> pd.DataFrame:
         """
         Joins information from scores and predictions, and computes classification metrics
@@ -92,10 +113,7 @@ class LTRBEINFMetrics(MetricsExperiment):
         :param int_class:
         :return:
         """
-        # Join scores and predictions
-        df = self._load_data(data_type)
-        predictions_df = self.read_predictions(data_type)
-        df_all = df.join(predictions_df)
+        df_all = self._join_data_predictions(data_type=data_type)
         # Add label for classification problem
         df_label = self._add_labels(df_all, int_class=int_class)
         label = f'label_{int_class}'
@@ -124,8 +142,9 @@ class LTRBEINFMetrics(MetricsExperiment):
     @staticmethod
     def class_metrics(df: pd.DataFrame, int_class: int):
         y_true = df[f'label_{int_class}'].values
+        y_pred_scores = df[f'p{int_class}'].values
         y_pred = df['y_pred_class'].values
-        metrics = ml_utils.class_metrics(y_true, y_pred)
+        metrics = ml_utils.class_metrics(y_true, y_pred, y_pred_scores)
         return metrics
 
     @staticmethod
@@ -138,16 +157,18 @@ class LTRBEINFMetrics(MetricsExperiment):
                                                                 float(int_class) if y_pred == 1 else None)
         return df
 
-    def apply_class_model(self, data_type: str, int_class: int, metric: str) -> pd.Series:
+    def apply_class_model(self, data_type: str, int_class: int, metric_dict: Dict) -> pd.Series:
         """
         Returns a pandas Series containing all the rows of the original dataset, indicating whether a value
         has been classified as 0 or 1 using the classification models. Values that are non0 /non1 are informed
         as NaN.
         :param data_type: train, test, validation
         :param int_class: 0 or 1
-        :param metric: metric to optimize
+        :param metric_dict: {'metric': 'f1', th: 0.2}, {'metric': 'f1', th: None}
         :return:
         """
+        metric = metric_dict['metric']
+        chosen_th = metric_dict.get('th')
         if metric not in conf.CLASS_METRICS:
             raise ValueError(f'metric must be one of {conf.CLASS_METRICS}')
 
@@ -157,7 +178,7 @@ class LTRBEINFMetrics(MetricsExperiment):
         print('Computing metrics with different ths')
         th_metrics = self.th_class_metrics(df_label, int_class)
         # Choose best th for metric
-        best_th_for_metric = ml_utils.select_best_th(th_metrics, metric)
+        best_th_for_metric = ml_utils.select_best_th(th_metrics, metric) if not chosen_th else chosen_th
         print(f'Using {best_th_for_metric} as th to optimize {metric}')
         th_metrics['opt_th'] = best_th_for_metric
         # Create class labels based on this th
@@ -171,4 +192,46 @@ class LTRBEINFMetrics(MetricsExperiment):
         df_mod = self._assign_new_score_class(df_class_label, int_class)
         return df_mod[f'mod_class_{int_class}']
 
+    def _join_class_models(self, data_type: str) -> pd.DataFrame:
+        """
+        Computes the prediction for every classification model. The result is a df with two columns, containing the
+        labels for each model.
+        :return:
+        """
+        df_models = pd.DataFrame()
+        assert all([k in [0, 1] for k in self.class_metric_dict.keys()]), 'Keys must be 0 or 1'
+        for int_class, metric_dict in self.class_metric_dict.items():
+            model_results = self.apply_class_model(data_type=data_type, int_class=int_class, metric_dict=metric_dict)
+            df_models[f'model_{int_class}'] = model_results
+        return df_models
 
+    def combine_models(self, data_type: str):
+        """
+        Returns a pandas df with two columns: original scores and predictions. These predictions are a mix between
+        classification models and beta regression.
+        :param data_type:
+        :return:
+        """
+        def apply_model(x) -> float:
+            return 0.0 if x['model_0'] == 0.0 else 1.0 if x['model_1'] == 1.0 else x['pred']
+
+        df_models = self._join_class_models(data_type=data_type)
+        df_scores_predictions = self._join_data_predictions(data_type=data_type)
+        df_all = df_models.join(df_scores_predictions[['mu', 'score']])
+        df_all = df_all.rename({'mu': 'pred'}, axis=1)
+        df_all['pred'] = df_all.apply(apply_model, axis=1)
+        return df_all[['pred', 'score']]
+
+    def metrics(self, data_type: str) -> Dict:
+        df = self.combine_models(data_type=data_type)
+        y_true = df['score'].values
+        y_pred = df['pred'].values
+        return ml_utils.regression_metrics(y_true, y_pred)
+
+    def get_metrics(self, data_type: str) -> Dict:
+        path_2_read = self.METRICS_PATH[data_type]
+        print('Reading metrics from', path_2_read)
+        if os.path.exists(path_2_read):
+            return pickle.load(open(path_2_read, 'rb'))
+        else:
+            raise ValueError(f"{path_2_read} does not exist; please execute metrics")
