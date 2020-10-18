@@ -9,11 +9,11 @@ import pandas as pd
 
 # Other
 from typing import Dict
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 import os
 
 
-class RankExperiment(Experiment):
+class RankExperiment(Experiment, ABC):
     """
     Class that represents a ranking system. Every class that extends this one must provide a ranking method, that
     will use a score assigned to each event for a given match.
