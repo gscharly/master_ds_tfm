@@ -112,10 +112,6 @@ class LearnToRank(Experiment):
             with open(self.config_path, 'wb') as fp:
                 pickle.dump(self.config(), fp)
 
-    def _create_directory_if_not_exists(self):
-        if not os.path.exists(self.path):
-            os.makedirs(self.path)
-
     def read(self) -> pd.DataFrame:
         if os.path.exists(self.file_path):
             return pd.read_csv(self.file_path)
