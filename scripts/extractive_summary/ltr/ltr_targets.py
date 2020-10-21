@@ -7,6 +7,7 @@ from sklearn.pipeline import Pipeline
 import numpy as np
 import pandas as pd
 import gensim.downloader as api
+from textdistance import damerau_levenshtein
 import os
 
 from scripts.text.basic_text_processor import BasicTextProcessor
@@ -18,7 +19,7 @@ class LTRTargets(LearnToRank):
     """
     Class that contains metrics and distances used to build targets for a Learning to Rank algorithm.
     """
-    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'wmd']
+    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'cosine_tf', 'wmd', 'leve']
     ROUGE_PARAMS = ['rouge_mode', 'rouge_metric']
     LTR_TYPE = 'targets'
 
@@ -64,6 +65,17 @@ class LTRTargets(LearnToRank):
         # proc_article_sents_fil = list(filter(lambda sent: sent != '', proc_article_sents))
         return proc_events, proc_article_sents
 
+    @staticmethod
+    def _choose_pipeline(mode: str, **count_vec_kwargs) -> Pipeline:
+        if mode not in ['tfidf', 'tf']:
+            raise ValueError("Mode must be one of [tfidf, tf]")
+
+        if mode == 'tfidf':
+            return Pipeline([('count', CountVectorizer(**count_vec_kwargs)),
+                             ('tfid', TfidfTransformer())])
+        else:
+            return Pipeline([('count', CountVectorizer(**count_vec_kwargs))])
+
     def rouge(self, match_dict: Dict, verbose=False, rouge_mode='rouge-l', rouge_metric='f') -> List[Dict]:
         """
         For a given list of events and article, this function calculates the ROUGE metric between each event and each
@@ -92,11 +104,10 @@ class LTRTargets(LearnToRank):
                 print()
         return event_article_list
 
-    def cosine_distance(self, match_dict: Dict, verbose: bool = False, **count_vec_kwargs):
+    def cosine_distance(self, match_dict: Dict, verbose: bool = False, mode: str = 'tfidf', **count_vec_kwargs):
         proc_events, proc_article_sents = self._process_events_article(match_dict)
-        # Train tfidf with article sentences
-        pipe = Pipeline([('count', CountVectorizer(**count_vec_kwargs)),
-                         ('tfid', TfidfTransformer())])
+        # Train tfidf or tf with article sentences
+        pipe = self._choose_pipeline(mode=mode, **count_vec_kwargs)
         x = pipe.fit_transform(proc_article_sents)
         x_events = pipe.transform(proc_events)
         # Distances
@@ -145,6 +156,34 @@ class LTRTargets(LearnToRank):
                 print()
         return event_article_list
 
+    def levenshtein(self, match_dict: Dict, verbose: bool = False, norm: bool = True):
+        """
+        This functions uses Levenshtein distance to calculate distances between events and article sentences.
+        :param match_dict:
+        :param verbose:
+        :param norm: whether to normalize distance
+        :return:
+        """
+        proc_events, proc_article_sents = self._process_events_article(match_dict)
+        event_article_list = list()
+        for event_ix, event in enumerate(proc_events):
+            if norm:
+                event_ref_scores = [damerau_levenshtein.normalized_distance(event, ref_sent)
+                                    for ref_sent in proc_article_sents]
+            else:
+                event_ref_scores = [damerau_levenshtein(event, ref_sent)
+                                    for ref_sent in proc_article_sents]
+            # Minimum distance
+            sentence_ix = event_ref_scores.index(min(event_ref_scores))
+            event_article_list.append(
+                {'event_ix': event_ix, 'sentence_ix': sentence_ix, 'score': min(event_ref_scores)}
+            )
+            if verbose:
+                print('Event:', event)
+                print('Nearest article sentence:', proc_article_sents[sentence_ix])
+                print()
+        return event_article_list
+
     def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None):
         """
         Calculates the target for a match. Specific metric params can be passed.
@@ -161,8 +200,12 @@ class LTRTargets(LearnToRank):
                 'Rouge params are {}'.format(self.ROUGE_PARAMS)
             event_article_list = self.rouge(match_dict, verbose, **self.metric_params)
         elif self.metric == 'cosine_tfidf':
-            event_article_list = self.cosine_distance(match_dict, verbose, **self.metric_params)
+            event_article_list = self.cosine_distance(match_dict, verbose, mode='tfidf', **self.metric_params)
+        elif self.metric == 'cosine_tf':
+            event_article_list = self.cosine_distance(match_dict, verbose, mode='tf', **self.metric_params)
         elif self.metric == 'wmd':
+            event_article_list = self.wmd(match_dict, verbose, **self.metric_params)
+        elif self.metric == 'leve':
             event_article_list = self.wmd(match_dict, verbose, **self.metric_params)
         else:
             raise ValueError('Metric {} is not available. Try one of {}'.format(self.metric,
