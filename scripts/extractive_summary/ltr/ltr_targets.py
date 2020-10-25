@@ -72,7 +72,7 @@ class LTRTargets(LearnToRank):
 
         if mode == 'tfidf':
             return Pipeline([('count', CountVectorizer(**count_vec_kwargs)),
-                             ('tfid', TfidfTransformer())])
+                             ('tfidf', TfidfTransformer())])
         else:
             return Pipeline([('count', CountVectorizer(**count_vec_kwargs))])
 

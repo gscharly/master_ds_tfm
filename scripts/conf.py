@@ -100,7 +100,7 @@ SUMMARY_PATH = CSV_DATA_PATH + '/summaries'
 ARTICLES_PATH = CSV_DATA_PATH + '/articles_events.csv'
 METRICS_PATH = DATA_PATH + '/metrics'
 
-LTR_PATH = '{}/summaries/ltr'.format(CSV_DATA_PATH)
+LTR_PATH = '{}/ltr'.format(DATA_PATH)
 
 LEAGUE_FILES = ['premier_league_2018_2019.json', 'mls_2015_2016.json',
                'mls_2019_2020.json', 'premier_league_2016_2017.json',
