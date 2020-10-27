@@ -75,8 +75,8 @@ class LTRFeaturesTargetsTF(LearnToRank):
         return {
             'x_train': X_train,
             'y_train': y_train,
-            'x_val': X_val,
-            'y_val': y_val,
+            'x_validation': X_val,
+            'y_validation': y_val,
             'x_test': X_test,
             'y_test': y_test
         }
@@ -84,7 +84,7 @@ class LTRFeaturesTargetsTF(LearnToRank):
     @property
     def datasets_path(self) -> Dict:
         return {name: f'{self.path}/{name}.pickle' for name in ['x_train', 'y_train',
-                                                                'x_val', 'y_val',
+                                                                'x_validation', 'y_validation',
                                                                 'x_test', 'y_test']}
 
     def _save_datasets(self, dataset_dict: Dict):

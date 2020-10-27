@@ -5,10 +5,11 @@ from scripts.conf import MODELS_PATH
 # DS imports
 import numpy as np
 from sklearn.pipeline import Pipeline
+from scipy.sparse.csr import csr_matrix
 
 # Other imports
 from abc import abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, Optional, Tuple
 import pickle
 import os
 
@@ -67,13 +68,8 @@ class TrainALlExperiment(Experiment):
         pass
 
     @abstractmethod
-    def read_data(self) -> np.array:
-        """Returns data as a numpy array"""
-        pass
-
-    @property
-    @abstractmethod
-    def target_col(self) -> str:
+    def train_data(self) -> Tuple[csr_matrix, np.array]:
+        """Returns x_train and y_train"""
         pass
 
     def _persist_model(self, best_model, model_info: Dict):
@@ -98,12 +94,7 @@ class TrainALlExperiment(Experiment):
         Method that trains a model
         :return:
         """
-        # Load and preprocess data
-        x = self.read_data()
-        # Split into train, test and validation
-
-        X_train = df_train.loc[:, self.features_cols]
-        y_train = df_train[self.target_col]
+        X_train, y_train = self.train_data()
         # Load model
         pipeline = self.pipeline()
         # Train model

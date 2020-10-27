@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from typing import Dict
 import pickle
+import os
 
 
 class MetricsExperiment:
@@ -35,8 +36,11 @@ class MetricsExperiment:
             raise ValueError("data_type must be one of train, validation, test")
         else:
             print(f'Computing metric for {data_type} dataset')
-            metrics = self.metrics(data_type=data_type)
-            self.persist_metrics(metrics, data_type=data_type)
+            if os.path.exists(self.metrics_path[data_type]):
+                return pickle.load(open(self.metrics_path[data_type], 'rb'))
+            else:
+                metrics = self.metrics(data_type=data_type)
+                self.persist_metrics(metrics, data_type=data_type)
 
     def run(self):
         """Computes and persists metrics for train, test and validation datasets"""
