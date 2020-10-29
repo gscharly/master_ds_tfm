@@ -1,5 +1,5 @@
 # Scripts
-from scripts.models.train_all_experiment import TrainALlExperiment
+from scripts.models.train_all_experiment import TrainAllExperiment
 from scripts.extractive_summary.ltr.ltr_features_targets_tf import LTRFeaturesTargetsTF
 
 # DS
@@ -15,7 +15,7 @@ from typing import Dict, Tuple
 import pickle
 
 
-class LTRSVMTFTrain(TrainALlExperiment):
+class LTRSVMTFTrain(TrainAllExperiment):
     """
     SVM regression model to apply to TF/TFIDF generated features
     """

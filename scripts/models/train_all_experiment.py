@@ -14,7 +14,7 @@ import pickle
 import os
 
 
-class TrainALlExperiment(Experiment):
+class TrainAllExperiment(Experiment):
     """
     This abstraction is meant to be used when features are too big to use a df (for example with a
     tf with big vocabulary). This training experiment will directly load and train a preprocessed sparse
@@ -46,6 +46,10 @@ class TrainALlExperiment(Experiment):
     @property
     def model_path(self) -> str:
         return '{}/ckpt.pickle'.format(self.path)
+
+    @property
+    def keras_model_path(self) -> str:
+        return f'{self.path}/keras_model.h5'
 
     def read_model(self) -> Pipeline:
         return pickle.load(open(self.model_path, 'rb'))
