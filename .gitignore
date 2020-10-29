@@ -13,3 +13,4 @@ summaries.txt
 *.Rproj
 .Rhistory
 *.csv
+*.h5
