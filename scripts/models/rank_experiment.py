@@ -2,13 +2,16 @@
 from scripts.experiments.experiment import Experiment
 from scripts.models.ltr_beinf.train import LTRBEINFTrain
 from scripts.extractive_summary.ltr.ltr_features_targets import LTRFeaturesTargets
+from scripts.extractive_summary.ltr.ltr_features_targets_tf import LTRFeaturesTargetsTF
 from scripts.conf import MODELS_PATH
 
 # DS imports
 import pandas as pd
+import numpy as np
+from scipy.sparse.csr import csr_matrix
 
 # Other
-from typing import Dict
+from typing import Dict, Tuple, Union
 from abc import abstractmethod, ABC
 import os
 
@@ -66,9 +69,16 @@ class RankExperiment(Experiment, ABC):
     def path(self) -> str:
         return '{}/{}/{}'.format(MODELS_PATH, self.rank_type, self.experiment_id())
 
-    def load_data(self) -> pd.DataFrame:
+    def load_data(self) -> Union[pd.DataFrame, Tuple[csr_matrix, pd.DataFrame]]:
         """Reads data from all matches"""
-        return self.ltr.read() if isinstance(self.ltr, LTRFeaturesTargets) else self.ltr.ltr.read()
+        # Baseline
+        if isinstance(self.ltr, LTRFeaturesTargets):
+            return self.ltr.read()
+        else:
+            if isinstance(self.ltr.ltr, LTRFeaturesTargetsTF):
+                return self.ltr.ltr.read_features_targets()
+            else:
+                self.ltr.ltr.read()
 
     def _write_summaries(self, df: pd.DataFrame):
         self._create_directory_if_not_exists()

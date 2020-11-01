@@ -87,6 +87,10 @@ class LTRFeaturesTargetsTF(LearnToRank):
                                                                 'x_validation', 'y_validation',
                                                                 'x_test', 'y_test']}
 
+    def _save_default_datasets(self, x, targets):
+        pickle.dump(x, open(f'{self.path}/x.pickle', 'wb'))
+        targets.to_csv(f'{self.path}/targets.csv', index=False)
+
     def _save_datasets(self, dataset_dict: Dict):
         print(f'Saving datasets in {self.path}')
         for name, dataset in dataset_dict.items():
@@ -101,12 +105,13 @@ class LTRFeaturesTargetsTF(LearnToRank):
         if os.path.exists(self.file_path):
             print('{} already exists'.format(self.file_path))
             return
+        self._write_config()
         x = self.features.get_features()
         targets = self.targets.get_targets()
         y = targets['score'].values
+        self._save_default_datasets(x, targets)
         # Train/val/test split
         datasets_dict = self._train_val_test_split(x, y)
-        self._write_config()
         self._save_datasets(datasets_dict)
 
     def get_features_targets(self) -> pd.DataFrame:

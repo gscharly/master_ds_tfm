@@ -4,9 +4,11 @@ from scripts.conf import TEAMS, LTR_PATH
 import scripts.utils.ml_utils as ml_utils
 
 from abc import abstractmethod
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import os
 import pandas as pd
+import numpy as np
+from scipy.sparse.csr import csr_matrix
 import pickle
 from tqdm import tqdm
 
@@ -117,6 +119,12 @@ class LearnToRank(Experiment):
             return pd.read_csv(self.file_path)
         else:
             raise ValueError("{} does not exists".format(self.file_path))
+
+    def read_features_targets(self) -> Tuple[csr_matrix, pd.DataFrame]:
+        """Used when features and targets are separated (svm, nn...)"""
+        x = pickle.load(open(f'{self.path}/x.pickle', 'rb'))
+        targets = pd.read_csv(f'{self.path}/targets.csv')
+        return x, targets
 
     def get_config(self) -> Dict:
         if os.path.exists(self.config_path):
