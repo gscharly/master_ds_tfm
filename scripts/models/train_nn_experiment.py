@@ -59,14 +59,10 @@ class TrainNNExperiment(Experiment):
 
     @property
     def model_path(self) -> str:
-        return '{}/ckpt.pickle'.format(self.path)
-
-    @property
-    def keras_model_path(self) -> str:
         return f'{self.path}/keras_model.h5'
 
-    def read_model(self) -> Pipeline:
-        return pickle.load(open(self.model_path, 'rb'))
+    def read_model(self) -> Union[Pipeline, keras.Model]:
+        return keras.models.load_model(self.model_path)
 
     def read_keras_model(self) -> Pipeline:
         # Load the pipeline first:
@@ -77,7 +73,7 @@ class TrainNNExperiment(Experiment):
 
     @property
     def model_info_path(self) -> str:
-        return '{}/model_info.pickle'.format(self.path)
+        return '{}/history.pickle'.format(self.path)
 
     def read_model_info(self) -> Dict:
         return pickle.load(open(self.model_info_path, 'rb'))
@@ -105,12 +101,12 @@ class TrainNNExperiment(Experiment):
     def _persist_model(self, best_model, model_info: Dict):
         pass
 
-    def _persist_keras_pipeline(self, model: Union[Pipeline, Model]):
+    def _persist_keras_pipeline(self, model: Union[Pipeline, Model], history):
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         if isinstance(model, Pipeline):
             # Save the Keras model first:
-            model.named_steps['estimator'].model.save(self.keras_model_path)
+            model.named_steps['estimator'].model.save(self.model_path)
 
             # This hack allows us to save the sklearn pipeline:
             model.named_steps['estimator'].model = None
@@ -118,7 +114,8 @@ class TrainNNExperiment(Experiment):
             # Finally, save the pipeline:
             pickle.dump(model, open(self.model_path, 'wb'))
         else:
-            model.save(self.keras_model_path)
+            model.save(self.model_path)
+        pickle.dump(history.history, open(self.model_info_path, 'wb'))
 
     def _model_info(self, pipeline: Pipeline) -> Dict:
         pass
@@ -139,16 +136,16 @@ class TrainNNExperiment(Experiment):
         # a generator
         train_generator = BatchGenerator(X_train, y_train, batch_size=self.batch_size)
         val_generator = BatchGenerator(X_val, y_val, batch_size=self.batch_size)
-        pipeline.fit(x=train_generator,
-                     validation_data=val_generator,
-                     epochs=self.epochs,
-                     validation_steps=len(val_generator),
-                     steps_per_epoch=len(train_generator),
-                     shuffle=self.shuffle,
-                     workers=self.workers,
-                     use_multiprocessing=self.use_multiprocessing,
-                     max_queue_size=self.max_queue_size,
-                     callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)],
-                     verbose=1)
+        history = pipeline.fit(x=train_generator,
+                               validation_data=val_generator,
+                               epochs=self.epochs,
+                               validation_steps=len(val_generator),
+                               steps_per_epoch=len(train_generator),
+                               shuffle=self.shuffle,
+                               workers=self.workers,
+                               use_multiprocessing=self.use_multiprocessing,
+                               max_queue_size=self.max_queue_size,
+                               callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)],
+                               verbose=1)
         # Persist
-        self._persist_keras_pipeline(pipeline)
+        self._persist_keras_pipeline(pipeline, history)
