@@ -78,7 +78,7 @@ class RankExperiment(Experiment, ABC):
             if isinstance(self.ltr.ltr, LTRFeaturesTargetsTF):
                 return self.ltr.ltr.read_features_targets()
             else:
-                self.ltr.ltr.read()
+                return self.ltr.ltr.read()
 
     def _write_summaries(self, df: pd.DataFrame):
         self._create_directory_if_not_exists()
