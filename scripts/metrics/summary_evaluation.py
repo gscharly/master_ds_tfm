@@ -1,11 +1,13 @@
 from scripts.text.basic_text_processor import BasicTextProcessor
 import scripts.conf as conf
+from scripts.models.rank_with_model.rank_with_model import RankModel
+from scripts.models.baseline_rank.baseline_rank import BaselineRank
 
 import os
 from os import listdir
 from os.path import isfile, join
 import pickle
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 import warnings
 
 import pandas as pd
@@ -14,6 +16,9 @@ from rouge import Rouge
 
 class SummaryEvaluation:
     AVAILABLE_METRICS = ['rouge']
+    JOIN_COLS = ['url']
+    MATCH_COLS = JOIN_COLS + ['json_file', 'article', 'events']
+    SUM_COLS = JOIN_COLS + ['summary_events']
 
     def __init__(self, metric: str):
         assert metric in self.AVAILABLE_METRICS, 'Available metrics: {}'.format(self.AVAILABLE_METRICS)
@@ -125,13 +130,11 @@ class SummaryEvaluation:
         only_files = [f for f in listdir(conf.SUMMARY_PATH) if isfile(join(conf.SUMMARY_PATH, f)) and 'map' not in f]
         print("Evaluating the following summaries:", only_files)
         pd_matches = pd.read_csv(conf.ARTICLES_PATH)
-        join_cols = ['json_file', 'url']
-        match_cols = join_cols + ['article', 'events']
-        sum_cols = join_cols + ['summary_events']
         for f in only_files:
             print('Evaluating', f)
             pd_summaries = pd.read_csv(join(conf.SUMMARY_PATH, f))
-            pd_matches_sum = pd_matches[match_cols].merge(pd_summaries[sum_cols], on=join_cols, how='inner')
+            pd_matches_sum = pd_matches[self.MATCH_COLS].merge(pd_summaries[self.SUM_COLS], on=self.JOIN_COLS,
+                                                               how='inner')
             results_path = '{}/summaries/{}/{}'.format(conf.METRICS_PATH, self.metric, f.split('.')[0])
             if preprocess_text:
                 results_path += '_processed'
@@ -212,5 +215,43 @@ class SummaryEvaluation:
             scores_dict = pickle.load(fp)
         return self._exp_metrics_avg(scores_dict)
 
+    def _rank_path(self, rank: Union[RankModel, BaselineRank], preprocess_text: bool):
+        """
+        Creates the file name for each rank experiment.
+        - For a rank using a model:
+            ../summaries/METRIC/RANKTYPE_MODELTYPE_TARGETMETRIC_MODELHASH_PROCESSED
+        :param rank:
+        :param preprocess_text:
+        :return:
+        """
+        main_path = f'{conf.METRICS_PATH}/summaries/{self.metric}'
+        if isinstance(rank, RankModel):
+            path = f'{main_path}/{rank.RANK_TYPE}_{rank.ltr.MODEL_TYPE}'
+            if rank.ltr.ltr.target_metric == 'rouge':
+                rouge_type = '{}_{}'.format(rank.ltr.ltr.metric_params['rouge_mode'],
+                                            rank.ltr.ltr.metric_params['rouge_metric'])
+                path = f'{path}_{rouge_type}'
+            else:
+                path = f'{path}_{rank.ltr.ltr.target_metric}'
 
+            path = f'{path}_{rank.ltr.experiment_id()}'
 
+            if preprocess_text:
+                path = path + '_processed'
+            return path
+        elif isinstance(rank, BaselineRank):
+            path = f'{main_path}/{rank.RANK_TYPE}'
+            if preprocess_text:
+                path = path + '_processed'
+            return path
+        else:
+            raise ValueError('rank must be of type: RankModel, BaselineRank')
+
+    def evaluate_rank(self, rank: Union[RankModel, BaselineRank], **evaluate_kwargs):
+        rank.run()
+        pd_summaries = rank.read_summaries()
+        pd_matches = pd.read_csv(conf.ARTICLES_PATH)
+        pd_matches_sum = pd_matches[self.MATCH_COLS].merge(pd_summaries[self.SUM_COLS], on=self.JOIN_COLS, how='inner')
+        path = self._rank_path(rank, evaluate_kwargs['preprocess_text'])
+        print(f'Saving to {path}')
+        return self.evaluate(pd_df_summaries=pd_matches_sum, path=path, **evaluate_kwargs)

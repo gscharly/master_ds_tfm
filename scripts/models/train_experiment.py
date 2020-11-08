@@ -108,6 +108,7 @@ class TrainExperiment(Experiment):
         Method that trains a model
         :return:
         """
+        self._write_config()
         # Load and preprocess data
         df_train = self.train_data()
         df_train = self.preprocess_data(df_train)

@@ -98,6 +98,7 @@ class TrainAllExperiment(Experiment):
         Method that trains a model
         :return:
         """
+        self._write_config()
         X_train, y_train = self.train_data()
         # Load model
         pipeline = self.pipeline()

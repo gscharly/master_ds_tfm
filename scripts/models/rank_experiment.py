@@ -7,7 +7,6 @@ from scripts.conf import MODELS_PATH
 
 # DS imports
 import pandas as pd
-import numpy as np
 from scipy.sparse.csr import csr_matrix
 
 # Other
@@ -94,4 +93,8 @@ class RankExperiment(Experiment, ABC):
     @staticmethod
     @abstractmethod
     def rank(df: pd.DataFrame):
+        pass
+
+    @abstractmethod
+    def run(self):
         pass

@@ -8,6 +8,7 @@ import pandas as pd
 # Other
 from abc import ABC, abstractmethod
 from typing import Dict
+import os
 
 
 class RowNumberRank(RankExperiment, ABC):
@@ -75,6 +76,9 @@ class RowNumberRank(RankExperiment, ABC):
         Computes summaries based on baseline ranking, saving the results in .csv
         :return:
         """
+        if os.path.exists(f'{self.path}/summaries.csv'):
+            print('Ranked summaries already exist')
+            return
         rank_df = self.rank_events()
         events_df = self._create_events_df()
         match_rank_df = self._ranked_summaries(rank_df, events_df)
