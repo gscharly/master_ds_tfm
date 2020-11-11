@@ -215,6 +215,21 @@ class SummaryEvaluation:
             scores_dict = pickle.load(fp)
         return self._exp_metrics_avg(scores_dict)
 
+    @staticmethod
+    def _append_metric_info(path: str, rank: Union[RankModel, BaselineRank]):
+        if isinstance(rank, RankModel):
+            ltr_rank = rank.ltr.ltr
+        else:
+            ltr_rank = rank.ltr
+
+        if ltr_rank.target_metric == 'rouge':
+            rouge_type = '{}_{}'.format(ltr_rank.metric_params['rouge_mode'],
+                                        ltr_rank.metric_params['rouge_metric'])
+            path = f'{path}_{rouge_type}'
+        else:
+            path = f'{path}_{ltr_rank.target_metric}'
+        return path
+
     def _rank_path(self, rank: Union[RankModel, BaselineRank], preprocess_text: bool):
         """
         Creates the file name for each rank experiment.
@@ -227,20 +242,14 @@ class SummaryEvaluation:
         main_path = f'{conf.METRICS_PATH}/summaries/{self.metric}'
         if isinstance(rank, RankModel):
             path = f'{main_path}/{rank.RANK_TYPE}_{rank.ltr.MODEL_TYPE}'
-            if rank.ltr.ltr.target_metric == 'rouge':
-                rouge_type = '{}_{}'.format(rank.ltr.ltr.metric_params['rouge_mode'],
-                                            rank.ltr.ltr.metric_params['rouge_metric'])
-                path = f'{path}_{rouge_type}'
-            else:
-                path = f'{path}_{rank.ltr.ltr.target_metric}'
-
+            path = self._append_metric_info(path, rank)
             path = f'{path}_{rank.ltr.experiment_id()}'
-
             if preprocess_text:
                 path = path + '_processed'
             return path
         elif isinstance(rank, BaselineRank):
             path = f'{main_path}/{rank.RANK_TYPE}'
+            path = self._append_metric_info(path, rank)
             if preprocess_text:
                 path = path + '_processed'
             return path
