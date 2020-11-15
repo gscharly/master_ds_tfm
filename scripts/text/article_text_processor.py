@@ -3,6 +3,7 @@ from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.teams_players import TeamPlayers
 from scripts.conf import DATA_PATH, CSV_DATA_PATH, LEAGUES_DICT, REVERSE_LEAGUES_DICT
 
+
 # Other imports
 import os
 import json
@@ -49,6 +50,11 @@ class ArticleTextProcessor:
                 and self.text_proc.filter_noisy_characters(token)
                 and not self.text_proc.has_numbers(token)]
 
+    def basic_clean_tokens(self, doc) -> List[str]:
+        return [token.text for token in doc if self.text_proc.token_filter(token)
+                and self.text_proc.filter_noisy_characters(token)
+                and not self.text_proc.has_numbers(token)]
+
     def _clean_tokens(self, doc) -> List[str]:
         if self.lemma:
             return [token.lemma_.lower() for token in doc if self.text_proc.token_filter(token)
@@ -59,11 +65,12 @@ class ArticleTextProcessor:
                     and self.text_proc.filter_noisy_characters(token)
                     and not self.text_proc.has_numbers(token) and self.text_proc.token_filter_stopword(token)]
 
-    def process_match_text(self, text: str, text_type: str = 'event') -> List:
+    def process_match_text(self, text: str, text_type: str = 'event', process_type: str = 'complete') -> List:
         """
         Cleans tokens and retrieve entity names for a given text
         :param text:
         :param text_type: event or article
+        :param process_type: complete or basic
         :return:
         """
         if text_type == 'event':
@@ -74,7 +81,13 @@ class ArticleTextProcessor:
             raise ValueError("text_type available values are event and article")
 
         # Token cleaning
-        clean_tokens = self._clean_tokens(doc)
+        if process_type == 'complete':
+            clean_tokens = self._clean_tokens(doc)
+        elif process_type == 'basic':
+            clean_tokens = self.basic_clean_tokens(doc)
+        else:
+            raise ValueError('complete or basic')
+        print(clean_tokens)
         # TODO Add result changes tokens
         # result_list = self.text_proc.get_numbers(doc)
 
@@ -108,11 +121,11 @@ class ArticleTextProcessor:
 
         return tokens_en
 
-    def process_match_article(self, article: str) -> List[str]:
+    def process_match_article(self, article: str, process_type: str = 'complete') -> List[str]:
         doc_sents = self.text_proc.get_sentences(article)
         processed_sentences = list()
         for sentence in doc_sents:
-            tokens_en = self.process_match_text(sentence, text_type='article')
+            tokens_en = self.process_match_text(sentence, text_type='article', process_type=process_type)
             # print(tokens_en)
             processed_sentences.append(' '.join(tokens_en))
         return processed_sentences
