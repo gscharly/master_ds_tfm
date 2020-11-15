@@ -51,9 +51,8 @@ class ArticleTextProcessor:
                 and not self.text_proc.has_numbers(token)]
 
     def basic_clean_tokens(self, doc) -> List[str]:
-        return [token.text for token in doc if self.text_proc.token_filter(token)
-                and self.text_proc.filter_noisy_characters(token)
-                and not self.text_proc.has_numbers(token)]
+        return [token.text.lower() for token in doc if self.text_proc.token_filter(token)
+                and self.text_proc.filter_noisy_characters(token)]
 
     def _clean_tokens(self, doc) -> List[str]:
         if self.lemma:
@@ -87,7 +86,6 @@ class ArticleTextProcessor:
             clean_tokens = self.basic_clean_tokens(doc)
         else:
             raise ValueError('complete or basic')
-        print(clean_tokens)
         # TODO Add result changes tokens
         # result_list = self.text_proc.get_numbers(doc)
 
@@ -130,7 +128,7 @@ class ArticleTextProcessor:
             processed_sentences.append(' '.join(tokens_en))
         return processed_sentences
 
-    def _get_picke_paths(self, text_type: str = 'article', process: bool = False):
+    def get_pickle_paths(self, text_type: str = 'article', process: bool = False):
         if process and self.drop_teams and self.lemma:
             append = '_processed_lemma_teams_'
         elif process and self.drop_teams:
@@ -176,7 +174,7 @@ class ArticleTextProcessor:
             self.words[text_type].update(vocab_file_counter)
         self.vocabulary_dict[text_type] = self.words[text_type].most_common()
         if save:
-            path_dict = self._get_picke_paths(text_type, process)
+            path_dict = self.get_pickle_paths(text_type, process)
             with open(path_dict['path'], 'wb') as fp:
                 pickle.dump(self.vocabulary_dict[text_type], fp)
             with open(path_dict['path_files'], 'wb') as fp:
@@ -199,7 +197,7 @@ class ArticleTextProcessor:
         return self.vocabulary_dict[text_type]
 
     def get_vocabulary(self, text_type: str = 'article', process: bool = False) -> List:
-        path_dict = self._get_picke_paths(text_type, process)
+        path_dict = self.get_pickle_paths(text_type, process)
         if not os.path.exists(path_dict['path']):
             print('{} does not exists'.format(path_dict['path']))
             print('Building vocabulary for', text_type)
@@ -210,7 +208,7 @@ class ArticleTextProcessor:
         return vocab
 
     def get_vocabulary_file(self, text_type: str, league_name: str, process: bool):
-        path_dict = self._get_picke_paths(text_type, process)
+        path_dict = self.get_pickle_paths(text_type, process)
         with open(path_dict['path_files'], 'rb') as fp:
             vocab = pickle.load(fp)
         return vocab[league_name]

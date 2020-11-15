@@ -8,18 +8,22 @@ import numpy as np
 import pandas as pd
 import gensim.downloader as api
 from textdistance import damerau_levenshtein
+import torch
+from sentence_transformers import SentenceTransformer
 import os
 
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.article_text_processor import ArticleTextProcessor
 from scripts.extractive_summary.ltr.learn_to_rank import LearnToRank
 
+cuda = torch.device('cuda')
+
 
 class LTRTargets(LearnToRank):
     """
     Class that contains metrics and distances used to build targets for a Learning to Rank algorithm.
     """
-    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'cosine_tf', 'wmd', 'leve']
+    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'cosine_tf', 'wmd', 'leve', 'cosine_emb']
     ROUGE_PARAMS = ['rouge_mode', 'rouge_metric']
     LTR_TYPE = 'targets'
 
@@ -51,15 +55,15 @@ class LTRTargets(LearnToRank):
     def file_path(self) -> str:
         return '{}/{}.csv'.format(self.path, self.LTR_TYPE)
     
-    def _process_events_article(self, match_dict: Dict) -> Tuple[List[str], List[str]]:
+    def _process_events_article(self, match_dict: Dict, process_type: str = 'complete') -> Tuple[List[str], List[str]]:
         """
         Process events and articles text.
         :param match_dict:
         :return:
         """
-        proc_events = [' '.join(self.processor.process_match_text(event))
+        proc_events = [' '.join(self.processor.process_match_text(event, process_type=process_type))
                        for event in match_dict['events']]
-        proc_article_sents = self.processor.process_match_article(match_dict['article'])
+        proc_article_sents = self.processor.process_match_article(match_dict['article'], process_type=process_type)
         # Some events and articles are empty after processing
         # proc_events_fil = list(filter(lambda event: event != '', proc_events))
         # proc_article_sents_fil = list(filter(lambda sent: sent != '', proc_article_sents))
@@ -184,6 +188,45 @@ class LTRTargets(LearnToRank):
                 print()
         return event_article_list
 
+    def cosine_distance_sent_emb(self, match_dict: Dict, verbose: bool, embedding: str, text_process: str = None):
+        """
+        This function uses sentence embeddings to represent the events and the sentences of the article, and then
+        applies the cosine distance to obtain the nearest sentence in the article for each event.
+        :param match_dict:
+        :param verbose:
+        :param embedding: name of the model used to obtain the embedding.
+        See https://github.com/UKPLab/sentence-transformers
+        :param text_process: whether to preprocess the article text
+        :return:
+        """
+        if text_process:
+            proc_events, proc_article_sents = self._process_events_article(match_dict, process_type=text_process)
+        else:
+            proc_events = match_dict['events']
+            article_sentences = self.text_proc.get_sentences(match_dict['article'])
+            proc_article_sents = [str(sent).replace('\n', '') for sent in article_sentences]
+        model = SentenceTransformer(embedding)
+
+        events_embeddings = model.encode(proc_events)
+        article_embeddings = model.encode(proc_article_sents)
+
+        distances = cosine_similarity(events_embeddings, article_embeddings)
+        sentences_ixs = distances.argmax(axis=1)
+        event_article_list = [{'event_ix': event_ix,
+                               'sentence_ix': sentences_ixs[event_ix],
+                               'score': np.amax(distances[event_ix])}
+                              for event_ix in range(len(proc_events))]
+        if verbose:
+            article_sentences = self.text_proc.get_sentences(match_dict['article'])
+            article_sentences_text = [str(sent).replace('\n', '') for sent in article_sentences]
+            for event_ix in range(len(proc_events)):
+                print('Event:', match_dict['events'][event_ix])
+                print('Nearest article sentence:', article_sentences_text[sentences_ixs[event_ix]])
+                print('Processed event:', proc_events[event_ix])
+                print('Processed article sentence:', proc_article_sents[sentences_ixs[event_ix]])
+                print()
+        return event_article_list
+
     def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None):
         """
         Calculates the target for a match. Specific metric params can be passed.
@@ -206,7 +249,9 @@ class LTRTargets(LearnToRank):
         elif self.metric == 'wmd':
             event_article_list = self.wmd(match_dict, verbose, **self.metric_params)
         elif self.metric == 'leve':
-            event_article_list = self.wmd(match_dict, verbose, **self.metric_params)
+            event_article_list = self.levenshtein(match_dict, verbose, **self.metric_params)
+        elif self.metric == 'cosine_emb':
+            event_article_list = self.cosine_distance_sent_emb(match_dict, verbose, **self.metric_params)
         else:
             raise ValueError('Metric {} is not available. Try one of {}'.format(self.metric,
                                                                                 self.AVAILABLE_METRICS))
