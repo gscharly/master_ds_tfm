@@ -1,6 +1,7 @@
 # Scripts
 from scripts.models.train_all_experiment import TrainAllExperiment
 from scripts.extractive_summary.ltr.ltr_features_targets_tf import LTRFeaturesTargetsTF
+from scripts.models.dimensionality_reduction import DimensionalityReduction
 
 # DS
 import pandas as pd
@@ -22,10 +23,11 @@ class LTRSVMTFTrain(TrainAllExperiment):
     MODEL_TYPE = 'ltr_svm'
     N_JOBS = 5
 
-    def __init__(self, ltr_params: Dict, **train_exp_params):
+    def __init__(self, ltr_params: Dict, dim_reduction_params: Dict, **train_exp_params):
         super().__init__(**train_exp_params)
         self.ltr_params = ltr_params
         self.ltr = LTRFeaturesTargetsTF(**ltr_params)
+        self.dim_reduction = DimensionalityReduction(**dim_reduction_params) if dim_reduction_params else None
 
     def config(self) -> Dict:
         config_dict = {
@@ -34,6 +36,9 @@ class LTRSVMTFTrain(TrainAllExperiment):
         }
         config_dict.update(self.model_params)
         config_dict.update(self.ltr_params)
+        if self.dim_reduction:
+            config_dict['dim_reduction'] = self.dim_reduction.dim_reduction
+            config_dict['dim_reduction_params'] = self.dim_reduction.dim_reduction_params
         return config_dict
 
     @property
@@ -59,10 +64,19 @@ class LTRSVMTFTrain(TrainAllExperiment):
                               n_jobs=self.N_JOBS)
         else:
             rf = SVR(**self.model_params)
-        pipe = Pipeline(steps=[
-            ('model', rf)
-        ])
+
+        if self.dim_reduction:
+            steps = [('dim_reduction', self.dim_reduction.dim_reduction_pipe()),
+                     ('model', rf)]
+        else:
+            steps = [('model', rf)]
+
+        pipe = Pipeline(steps=steps)
         return pipe
 
-    def model_out(self, pipeline: Pipeline) -> pd.DataFrame:
-        pass
+    def model_out(self, pipeline: Pipeline) -> Dict:
+        dim_reduction_stage = pipeline['dim_reduction']
+        return {
+            'explained_variance': dim_reduction_stage.explained_variance_ratio_.sum()
+        }
+

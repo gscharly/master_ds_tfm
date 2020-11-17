@@ -7,7 +7,6 @@ from abc import abstractmethod
 from typing import Dict, Optional, Tuple
 import os
 import pandas as pd
-import numpy as np
 from scipy.sparse.csr import csr_matrix
 import pickle
 from tqdm import tqdm
@@ -157,6 +156,7 @@ class LearnToRank(Experiment):
                 match_df['url'] = match_url
                 match_df['json_file'] = season_file
                 self._write_match(match_df, self.file_path)
+                del match_df
 
     def train_val_test_split(self, train_perc: float, val_perc: float):
         pd_df = self.read()
