@@ -21,6 +21,14 @@ class RankModel(RowNumberRank):
     def rank_type(self) -> str:
         return self.RANK_TYPE
 
+    def _reduce_dim(self, x):
+        dim_reduction_stage = self.ltr.read_dim_reduction_trained()
+        print('Reducing x dimension')
+        print(f'Shape before: {x.shape}')
+        x = dim_reduction_stage.transform(x)
+        print(f'Shape after: {x.shape}')
+        return x
+
     def get_scores_df(self) -> pd.DataFrame:
         """
         Returns a df containing the following columns:
@@ -36,9 +44,12 @@ class RankModel(RowNumberRank):
         if isinstance(features_target, tuple):
             x = features_target[0]
             if self.is_nn:
-                # This is mandatory to predict using NN. This shouldn't alter the order of the rows (checked in notebook)
-                # It only orders the indices for each row
-                x.sort_indices()
+                if self.ltr.dim_reduction:
+                    x = self._reduce_dim(x)
+                else:
+                    # This is mandatory to predict using NN. This shouldn't alter the order of the rows (checked in notebook)
+                    # It only orders the indices for each row
+                    x.sort_indices()
             df_cols = features_target[1][['url', 'event_ix']].copy()
         else:
             x = self.ltr.preprocess_data(features_target)
