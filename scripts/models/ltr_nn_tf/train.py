@@ -1,6 +1,7 @@
 # Scripts
 from scripts.models.train_nn_experiment import TrainNNExperiment
 from scripts.extractive_summary.ltr.ltr_features_targets_tf import LTRFeaturesTargetsTF
+from scripts.models.dimensionality_reduction import DimensionalityReduction
 
 # DS
 import numpy as np
@@ -44,6 +45,9 @@ class LTRNNTFTrain(TrainNNExperiment):
         self._check_params(train_exp_params)
         # If dropout, ensure same vector length
         self._ensure_same_length_params(train_exp_params)
+        # Dimensionality reduction
+        dim_reduction_params = train_exp_params.get('dim_reduction_params')
+        self.dim_reduction = DimensionalityReduction(**dim_reduction_params) if dim_reduction_params else None
 
         super().__init__(**train_exp_params)
 
@@ -74,6 +78,9 @@ class LTRNNTFTrain(TrainNNExperiment):
         }
         config_dict.update(self.model_params)
         config_dict.update(self.ltr_params)
+        if self.dim_reduction:
+            config_dict['dim_reduction'] = self.dim_reduction.dim_reduction
+            config_dict['dim_reduction_params'] = self.dim_reduction.dim_reduction_params
         return config_dict
 
     @property
@@ -96,10 +103,6 @@ class LTRNNTFTrain(TrainNNExperiment):
         x = pickle.load(open(paths['x_validation'], 'rb'))
         y = pickle.load(open(paths['y_validation'], 'rb'))
         return x, y
-
-    def _get_input_dim(self):
-        x_train, _ = self.train_data()
-        return x_train.shape[1]
 
     def model_out(self, pipeline):
         pass
@@ -140,8 +143,7 @@ class LTRNNTFTrain(TrainNNExperiment):
         return model
 
     def pipeline(self):
-        input_dim = self._get_input_dim()
-        model = self.build_model(input_dim=input_dim)
+        model = self.build_model(input_dim=self.input_dim)
         # TODO if its necessary
         # pipe = Pipeline([
         #     ('scaler', StandardScaler()),

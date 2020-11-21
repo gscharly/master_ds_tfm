@@ -12,7 +12,7 @@ import numpy as np
 from scipy.sparse.csr import csr_matrix
 
 # Other
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 import pickle
 
 
@@ -23,7 +23,7 @@ class LTRSVMTFTrain(TrainAllExperiment):
     MODEL_TYPE = 'ltr_svm'
     N_JOBS = 5
 
-    def __init__(self, ltr_params: Dict, dim_reduction_params: Dict, **train_exp_params):
+    def __init__(self, ltr_params: Dict, dim_reduction_params: Optional[Dict], **train_exp_params):
         super().__init__(**train_exp_params)
         self.ltr_params = ltr_params
         self.ltr = LTRFeaturesTargetsTF(**ltr_params)

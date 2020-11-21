@@ -2,6 +2,7 @@
 from scripts.experiments.experiment import Experiment
 from scripts.conf import MODELS_PATH
 from scripts.utils.batch_generator import BatchGenerator
+from scripts.models.dimensionality_reduction import DimensionalityReduction
 
 # DS imports
 import numpy as np
@@ -26,7 +27,8 @@ class TrainNNExperiment(Experiment):
     """
 
     def __init__(self, model_params: Dict, epochs: int, batch_size: int, opt_metric: Optional[str] = None, cv: int = 0,
-                 shuffle: bool = True, workers: int = 6, use_multiprocessing: bool = False, max_queue_size: int = 10):
+                 shuffle: bool = True, workers: int = 6, use_multiprocessing: bool = False, max_queue_size: int = 10,
+                 dim_reduction_params: Optional[Dict] = None):
         super().__init__()
         self.model_params = model_params
         # CV settings
@@ -36,10 +38,13 @@ class TrainNNExperiment(Experiment):
         self.epochs = epochs
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.input_dim = None
         # Threads
         self.workers = workers
         self.use_multiprocessing = use_multiprocessing
         self.max_queue_size = max_queue_size
+        # Dim reduction
+        self.dim_reduction = DimensionalityReduction(**dim_reduction_params) if dim_reduction_params else None
 
     def config(self) -> Dict:
         pass
@@ -61,15 +66,26 @@ class TrainNNExperiment(Experiment):
     def model_path(self) -> str:
         return f'{self.path}/keras_model.h5'
 
-    def read_model(self) -> Union[Pipeline, keras.Model]:
-        return keras.models.load_model(self.model_path)
+    @property
+    def pipeline_model_path(self) -> str:
+        return f'{self.path}/ckpt.pickle'
+
+    @property
+    def dim_reduction_stage_path(self) -> str:
+        return f'{self.path}/{self.dim_reduction.dim_reduction}.pickle' if self.dim_reduction else None
+
+    def read_dim_reduction_trained(self):
+        return pickle.load(open(self.dim_reduction_stage_path, 'rb'))
 
     def read_keras_model(self) -> Pipeline:
         # Load the pipeline first:
-        pipeline = pickle.load(open(self.model_path, 'rb'))
+        pipeline = pickle.load(open(self.pipeline_model_path, 'rb'))
         # Then, load the Keras model:
-        pipeline.named_steps['estimator'].model = keras.models.load_model('keras_model.h5')
+        pipeline.named_steps['estimator'].model = keras.models.load_model(self.model_path)
         return pipeline
+
+    def read_model(self) -> Union[Pipeline, keras.Model]:
+        return keras.models.load_model(self.model_path)
 
     @property
     def model_info_path(self) -> str:
@@ -112,13 +128,29 @@ class TrainNNExperiment(Experiment):
             model.named_steps['estimator'].model = None
 
             # Finally, save the pipeline:
-            pickle.dump(model, open(self.model_path, 'wb'))
+            pickle.dump(model, open(self.pipeline_model_path, 'wb'))
         else:
             model.save(self.model_path)
         pickle.dump(history.history, open(self.model_info_path, 'wb'))
 
     def _model_info(self, pipeline: Pipeline) -> Dict:
         pass
+
+    def _train_transform_dim_reduction(self, x_train, x_val):
+        print(f'Training {self.dim_reduction.dim_reduction} with the following parameters:'
+              f'{self.dim_reduction.dim_reduction_params}')
+        print(f'Train shape before: {x_train.shape}')
+        print(f'Validation shape before: {x_val.shape}')
+        dim_reduction_stage = self.dim_reduction.dim_reduction_pipe()
+        dim_reduction_stage = dim_reduction_stage.fit(x_train)
+        # Save dim reduction stage
+        pickle.dump(dim_reduction_stage, open(self.dim_reduction_stage_path, 'wb'))
+        # Transform data
+        X_train = dim_reduction_stage.transform(x_train)
+        X_val = dim_reduction_stage.transform(x_val)
+        print(f'Train shape after: {X_train.shape}')
+        print(f'Validation shape after: {X_val.shape}')
+        return X_train, X_val
 
     def train(self):
         """
@@ -128,8 +160,14 @@ class TrainNNExperiment(Experiment):
         self._write_config()
         X_train, y_train = self.train_data()
         X_val, y_val = self.validation_data()
+        # Dim reduction
+        if self.dim_reduction:
+            X_train, X_val = self._train_transform_dim_reduction(X_train, X_val)
+
+        self.input_dim = X_train.shape[1]
         # Load model
         pipeline = self.pipeline()
+
         # Train model
         print('Training model...')
         # We will train the model by mini batches, converting the sparse matrix into dense little by little using
@@ -145,7 +183,7 @@ class TrainNNExperiment(Experiment):
                                workers=self.workers,
                                use_multiprocessing=self.use_multiprocessing,
                                max_queue_size=self.max_queue_size,
-                               callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)],
+                               callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)],
                                verbose=1)
         # Persist
         self._persist_keras_pipeline(pipeline, history)
