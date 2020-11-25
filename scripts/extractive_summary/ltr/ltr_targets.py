@@ -36,8 +36,8 @@ class LTRTargets(LearnToRank):
         self.metric = metric
         self.metric_params = metric_params
         self.text_proc = BasicTextProcessor()
-        self.drop_teams = drop_teams
-        self.lemma = lemma
+        self.drop_teams = processor.drop_teams if processor else drop_teams
+        self.lemma = processor.lemma if processor else lemma
 
     def config(self) -> Dict:
         return {

@@ -28,8 +28,8 @@ class LTRFeatures(LearnToRank):
 
         self.key_events_sum = KeyEventsSummary(key_events=key_events)
         self.text_proc = BasicTextProcessor()
-        self.lemma = lemma
-        self.drop_teams = drop_teams
+        self.drop_teams = processor.drop_teams if processor else drop_teams
+        self.lemma = processor.lemma if processor else lemma
         self.key_events = key_events
         self.count_vec_kwargs = count_vec_kwargs
 

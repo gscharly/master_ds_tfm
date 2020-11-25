@@ -32,8 +32,8 @@ class LTRFeaturesTF(LearnToRank):
         print(f'Setting mode to {mode}')
         self.mode = mode
         self.count_vec_kwargs = count_vec_kwargs
-        self.drop_teams = drop_teams
-        self.lemma = lemma
+        self.drop_teams = processor.drop_teams if processor else drop_teams
+        self.lemma = processor.lemma if processor else lemma
 
     def config(self) -> Dict:
         return {
