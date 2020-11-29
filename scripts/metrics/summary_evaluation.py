@@ -2,29 +2,35 @@ from scripts.text.basic_text_processor import BasicTextProcessor
 import scripts.conf as conf
 from scripts.models.rank_with_model.rank_with_model import RankModel
 from scripts.models.baseline_rank.baseline_rank import BaselineRank
+from scripts.metrics.sms import SMS
 
 import os
 from os import listdir
 from os.path import isfile, join
 import pickle
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Optional
 import warnings
 
 import pandas as pd
+import numpy as np
 from rouge import Rouge
 
 
 class SummaryEvaluation:
-    AVAILABLE_METRICS = ['rouge']
+    AVAILABLE_METRICS = ['rouge', 'sms']
     JOIN_COLS = ['url']
     MATCH_COLS = JOIN_COLS + ['json_file', 'article', 'events']
     SUM_COLS = JOIN_COLS + ['summary_events']
 
-    def __init__(self, metric: str):
+    def __init__(self, metric: str, sms_dict: Optional[Dict] = None):
         assert metric in self.AVAILABLE_METRICS, 'Available metrics: {}'.format(self.AVAILABLE_METRICS)
         print('Setting target metric to', metric)
         self.metric = metric
+        self.sms = SMS(**sms_dict) if sms_dict and self.metric == 'sms' else None
         self.text_proc = BasicTextProcessor()
+
+    def _preprocess_text_smd(self, text):
+        pass
 
     def _preprocess_text(self, text: str) -> str:
         """
@@ -61,6 +67,19 @@ class SummaryEvaluation:
         return scores_dict
 
     @staticmethod
+    def _avg_sms(scores_dict: Dict) -> float:
+        values = [val for _, league_dict in scores_dict.items() for val in league_dict.values()]
+        return np.mean(values)
+
+    def _avg_scores(self, scores_dict: Dict) -> Union[Dict, float]:
+        if self.metric == 'rouge':
+            return self._avg_rouge(scores_dict)
+        elif self.metric == 'sms':
+            return self._avg_sms(scores_dict)
+        else:
+            raise ValueError("Metric not available")
+
+    @staticmethod
     def rouge(candidate: str, reference: str, rouge_mode: str = None) -> Dict:
         if not rouge_mode:
             rouge = Rouge()
@@ -68,6 +87,14 @@ class SummaryEvaluation:
             rouge = Rouge(metrics=[rouge_mode])
         score = rouge.get_scores(candidate, reference)
         return score
+
+    def score_summaries(self, candidate: str, reference: str) -> Union[Dict, float]:
+        if self.metric == 'rouge':
+            return self.rouge(candidate, reference)
+        elif self.metric == 'sms':
+            return self.sms.calculate_sms(candidate, reference)
+        else:
+            raise ValueError("Metric not available")
 
     def evaluate(self, pd_df_summaries: pd.DataFrame, path: str, preprocess_text: bool = False,
                  summary_key: str = 'summary_events') -> Tuple[Dict, Dict]:
@@ -105,7 +132,7 @@ class SummaryEvaluation:
                     warnings.warn('Could not perform score: empty summary')
                     continue
                 else:
-                    scores = self.rouge(candidate, reference)
+                    scores = self.score_summaries(candidate, reference)
                     if row['json_file'] in scores_dict.keys():
                         scores_dict[row['json_file']][row['url']] = scores
                     else:
@@ -115,11 +142,11 @@ class SummaryEvaluation:
             with open(path + '.pickle', 'wb') as fp:
                 pickle.dump(scores_dict, fp)
 
-            avg_scores_dict = self._avg_rouge(scores_dict)
+            avg_scores = self._avg_scores(scores_dict)
             print('Writing avg to', path + '_avg.pickle')
             with open(path + '_avg.pickle', 'wb') as fp:
-                pickle.dump(avg_scores_dict, fp)
-            return scores_dict, avg_scores_dict
+                pickle.dump(avg_scores, fp)
+            return scores_dict, avg_scores
 
     def evaluate_all_summaries(self, preprocess_text: bool = False):
         """
@@ -151,22 +178,29 @@ class SummaryEvaluation:
         results_path = '{}/summaries/{}/upper_bound'.format(conf.METRICS_PATH, self.metric)
         _ = self.evaluate(pd_matches, results_path, preprocess_text=preprocess_text, summary_key='events')
 
-    @staticmethod
-    def _exp_metrics_avg(scores_dict: Dict) -> pd.DataFrame:
-        pd_dict = {
-            'metric': list(),
-            'metric_type': list(),
-            'value': list()
-        }
-        for metric, metric_dict in scores_dict.items():
-            for metric_type, metric_value in metric_dict.items():
-                pd_dict['metric'].append(metric)
-                pd_dict['metric_type'].append(metric_type)
-                pd_dict['value'].append(metric_value)
-        return pd.DataFrame(pd_dict)
+    def _exp_metrics_avg(self, scores: Union[Dict, float]) -> Union[pd.DataFrame, float]:
+        """
+        If using sms, the avg needs no process
+        :param scores:
+        :return:
+        """
+        if self.metric == 'rouge':
+            pd_dict = {
+                'metric': list(),
+                'metric_type': list(),
+                'value': list()
+            }
+            for metric, metric_dict in scores.items():
+                for metric_type, metric_value in metric_dict.items():
+                    pd_dict['metric'].append(metric)
+                    pd_dict['metric_type'].append(metric_type)
+                    pd_dict['value'].append(metric_value)
+            return pd.DataFrame(pd_dict)
+        else:
+            return scores
 
     @staticmethod
-    def _exp_metrics(scores_dict: Dict) -> pd.DataFrame:
+    def _exp_metrics_rouge(scores_dict: Dict) -> pd.DataFrame:
         pd_dict = {
             'metric': list(),
             'metric_type': list(),
@@ -187,7 +221,29 @@ class SummaryEvaluation:
                         pd_dict['url'].append(url)
         return pd.DataFrame(pd_dict)
 
-    def experiment_metrics_pandas(self, path: str, avg: bool) -> pd.DataFrame:
+    @staticmethod
+    def _exp_metrics_sms(scores_dict: Dict) -> pd.DataFrame:
+        pd_dict = {
+            'score': list(),
+            'json_file': list(),
+            'url': list()
+        }
+        for league_file, league_dict in scores_dict.items():
+            for url, score in league_dict.items():
+                pd_dict['score'].append(score)
+                pd_dict['json_file'].append(league_file)
+                pd_dict['url'].append(url)
+        return pd.DataFrame(pd_dict)
+
+    def _exp_metrics(self, scores_dict: Dict) -> pd.DataFrame:
+        if self.metric == 'rouge':
+            return self._exp_metrics_rouge(scores_dict)
+        elif self.metric == 'sms':
+            return self._exp_metrics_sms(scores_dict)
+        else:
+            raise ValueError('check metric')
+
+    def experiment_metrics_pandas(self, path: str, avg: bool) -> Union[pd.DataFrame, float]:
         with open(path, 'rb') as fp:
             scores_dict = pickle.load(fp)
         if avg:
@@ -197,16 +253,23 @@ class SummaryEvaluation:
 
     def output_avg_metrics(self) -> pd.DataFrame:
         """
-        Returns a dictionary with the average scores for every experiment
+        Returns a pandas dataframe with the average scores for every experiment
         :return:
         """
         results_path = '{}/summaries/{}'.format(conf.METRICS_PATH, self.metric)
         only_files = [f for f in listdir(results_path) if isfile(join(results_path, f)) and 'avg' in f]
         all_scores_df = pd.DataFrame()
+        all_scores = list()
         for f in only_files:
-            file_score_df = self.experiment_metrics_pandas(join(results_path, f), avg=True)
-            file_score_df['experiment'] = f.split('.')[0][:-4]
-            all_scores_df = pd.concat([all_scores_df, file_score_df])
+            file_score = self.experiment_metrics_pandas(join(results_path, f), avg=True)
+            experiment_name = f.split('.')[0][:-4]
+            if isinstance(file_score, pd.DataFrame):
+                file_score['experiment'] = experiment_name
+                all_scores_df = pd.concat([all_scores_df, file_score])
+            else:
+                all_scores.append((experiment_name, file_score))
+        if self.metric == 'sms':
+            all_scores_df = pd.DataFrame(all_scores, columns=['experiment', 'score'])
         return all_scores_df
 
     def output_avg_bound(self) -> pd.DataFrame:

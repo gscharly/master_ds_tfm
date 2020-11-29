@@ -1,6 +1,7 @@
 from typing import List
 from spacy.tokens import Token
 import spacy
+import nltk
 
 # sklearn stuff
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
@@ -116,3 +117,15 @@ class BasicTextProcessor:
 
     def get_numbers(self, doc):
         return [token.text.lower() for token in doc if self.has_numbers(token)]
+
+    def preprocess_word_emb(self, text: str, word_emb: str):
+        sent_list = [sent for sent in nltk.sent_tokenize(text)]
+        if word_emb == "glove":
+            IDs = [[self.nlp.vocab.strings[t.text.lower()] for t in self.nlp(sent) if
+                    t.text.isalpha() and t.text.lower() not in stop_words] for sent in sent_list]
+        if word_emb == "elmo":
+            # no word IDs, just use spacy ids, but without lower/stop words
+            # IDs = [[nlp.vocab.strings[t.text] for t in nlp(sent)] for sent in sent_list]
+            IDs = [[self.nlp.vocab.strings[t.text] for t in self.nlp(sent)] for sent in sent_list]
+        id_list = [x for x in IDs if x != []]  # get rid of empty sents
+        text_list = [[token.text for token in self.nlp(x)] for x in sent_list if x != []]
