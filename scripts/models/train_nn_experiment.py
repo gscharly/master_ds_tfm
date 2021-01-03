@@ -8,14 +8,25 @@ from scripts.models.dimensionality_reduction import DimensionalityReduction
 import numpy as np
 from sklearn.pipeline import Pipeline
 from scipy.sparse.csr import csr_matrix
-from tensorflow import keras
-from tensorflow.keras import Model
 
 # Other imports
 from abc import abstractmethod
 from typing import Dict, Optional, Tuple, Union
 import pickle
 import os
+
+# Tensorflow
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import Model
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+
+    except RuntimeError as e:
+        print(e)
 
 
 class TrainNNExperiment(Experiment):

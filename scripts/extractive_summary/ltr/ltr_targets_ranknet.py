@@ -45,7 +45,7 @@ class LTRTargetsRanknet(LearnToRank):
         :param df:
         :return:
         """
-        cols = ['event_ix', 'sentence_ix', 'score']
+        cols = ['event_ix', 'sentence_ix', 'score', 'orig_ix']
         x1_cols = [f'{col}_x1' for col in cols]
         x2_cols = [f'{col}_x2' for col in cols]
         x_cols = x1_cols + x2_cols
@@ -86,6 +86,14 @@ class LTRTargetsRanknet(LearnToRank):
         url = url.replace('/', '_')
         return url
 
+    @staticmethod
+    def _process_final_df(df):
+        final_match_result = df[['event_ix_x1', 'sentence_ix_x1', 'event_ix_x2',
+                                 'label', 'orig_ix_x1', 'orig_ix_x2']].copy()
+        for col in final_match_result.columns:
+            final_match_result[col] = final_match_result[col].astype(int)
+        return final_match_result
+
     def create_targets(self):
         """
         Saves a csv comparing events for each match. The output will be:
@@ -114,13 +122,13 @@ class LTRTargetsRanknet(LearnToRank):
                 continue
             json_file = targets_match['json_file'].unique()[0]
             targets_match = targets_match.drop(['url', 'json_file'], axis=1)
+            targets_match['orig_ix'] = targets_match.index
             crossed_events = self._event_cart_product(targets_match)
             crossed_events_no_dup = self._drop_duplicates(crossed_events)
             labels = self._create_labels(crossed_events_no_dup)
-            final_match_result = labels[['event_ix_x1', 'sentence_ix_x1', 'event_ix_x2', 'label']].copy()
+            final_match_result = self._process_final_df(labels)
             final_match_result['url'] = url
             final_match_result['json_file'] = json_file
             print(f'Saving to {path_2_write}')
             final_match_result.to_csv(path_2_write, index=False)
             del final_match_result, labels, crossed_events_no_dup, targets_match
-

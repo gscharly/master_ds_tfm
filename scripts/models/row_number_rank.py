@@ -54,7 +54,7 @@ class RowNumberRank(RankExperiment, ABC):
     def _create_events_df(self) -> pd.DataFrame:
         all_files = self.processor.load_json()
         event_tuple_list = list()
-        for saeson_file, season_values in all_files.items():
+        for season_file, season_values in all_files.items():
             for match_url, match_dict in season_values.items():
                 for event_ix, event in enumerate(match_dict['events']):
                     event_tuple_list.append((match_url, event_ix, event))

@@ -156,7 +156,7 @@ class LearnToRank(Experiment):
                 match_df['url'] = match_url
                 match_df['json_file'] = season_file
                 self._write_match(match_df, self.file_path)
-                del match_df
+                del match_df, match_dict
 
     def train_val_test_split(self, train_perc: float, val_perc: float):
         pd_df = self.read()

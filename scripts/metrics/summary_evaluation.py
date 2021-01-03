@@ -98,21 +98,15 @@ class SummaryEvaluation:
 
     def evaluate(self, pd_df_summaries: pd.DataFrame, path: str, preprocess_text: bool = False,
                  summary_key: str = 'summary_events') -> Tuple[Dict, Dict]:
-        cond1 = os.path.exists(path + '.pickle') and os.path.exists(path + '_avg.pickle') and not preprocess_text
-        cond2 = (os.path.exists(path + '_processed.pickle') and os.path.exists(path + '_processed_avg.pickle')
-                 and preprocess_text)
-        if cond1:
+        main_cond = os.path.exists(path + '.pickle') and os.path.exists(path + '_avg.pickle')
+        cond1 = main_cond and not preprocess_text
+        cond2 = main_cond and preprocess_text
+
+        if cond1 or cond2:
             print('Metrics already exist')
             with open(path + '.pickle', 'rb') as fp:
                 scores_dict = pickle.load(fp)
             with open(path + '_avg.pickle', 'rb') as fp:
-                avg_scores_dict = pickle.load(fp)
-            return scores_dict, avg_scores_dict
-        elif cond2:
-            print('Metrics with processed text already exist')
-            with open(path + '_processed.pickle', 'rb') as fp:
-                scores_dict = pickle.load(fp)
-            with open(path + '_processed_avg', 'rb') as fp:
                 avg_scores_dict = pickle.load(fp)
             return scores_dict, avg_scores_dict
         else:
@@ -165,6 +159,7 @@ class SummaryEvaluation:
             results_path = '{}/summaries/{}/{}'.format(conf.METRICS_PATH, self.metric, f.split('.')[0])
             if preprocess_text:
                 results_path += '_processed'
+            print(results_path)
             _ = self.evaluate(pd_matches_sum, results_path, preprocess_text=preprocess_text)
 
     def bound_metrics(self, preprocess_text: bool = False):
@@ -175,7 +170,8 @@ class SummaryEvaluation:
         :return:
         """
         pd_matches = pd.read_csv(conf.ARTICLES_PATH)
-        results_path = '{}/summaries/{}/upper_bound'.format(conf.METRICS_PATH, self.metric)
+        suffix = '_processed' if preprocess_text else ''
+        results_path = '{}/summaries/{}/upper_bound{}'.format(conf.METRICS_PATH, self.metric, suffix)
         _ = self.evaluate(pd_matches, results_path, preprocess_text=preprocess_text, summary_key='events')
 
     def _exp_metrics_avg(self, scores: Union[Dict, float]) -> Union[pd.DataFrame, float]:

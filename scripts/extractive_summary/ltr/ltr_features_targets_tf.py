@@ -68,7 +68,7 @@ class LTRFeaturesTargetsTF(LearnToRank):
         train_val_perc = round(self.train_perc + self.val_perc, 1)
         test_perc = round(1 - train_val_perc, 1)
         X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=test_perc, random_state=self.RANDOM_SEED)
-        new_val_perc = test_perc / train_val_perc
+        new_val_perc = self.val_perc / train_val_perc
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=new_val_perc,
                                                           random_state=self.RANDOM_SEED)
         assert X_train.shape[0] + X_val.shape[0] + X_test.shape[0] == x.shape[0]

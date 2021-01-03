@@ -75,8 +75,11 @@ class LTRSVMTFTrain(TrainAllExperiment):
         return pipe
 
     def model_out(self, pipeline: Pipeline) -> Dict:
-        dim_reduction_stage = pipeline['dim_reduction']
-        return {
-            'explained_variance': dim_reduction_stage.explained_variance_ratio_.sum()
-        }
+        if self.dim_reduction:
+            dim_reduction_stage = pipeline['dim_reduction']
+            return {
+                'explained_variance': dim_reduction_stage.explained_variance_ratio_.sum()
+            }
+        else:
+            return dict()
 

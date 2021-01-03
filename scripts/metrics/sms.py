@@ -35,7 +35,7 @@ class SMS:
             Tuple[Tuple[List[int], List[int]], Dict[int, np.array]]:
         """
         Returns:
-        - Tuple of lists, one for each texts, indicating the ids for each sentence
+        - Tuple of lists, one for each text, indicating the ids for each sentence
         - Dictionary, where each key references a sentence id, and each value represents the sentence embedding
         :param candidate_emb:
         :param reference_emb:
@@ -71,16 +71,18 @@ class SMS:
         sim = math.exp(-dist)
         return sim
 
-    def calculate_sms(self, candidate: str, reference: str):
+    def calculate_sms(self, candidate: str, reference: str, already_processed: bool = False):
         """
         Computes SMS over two texts
         :param candidate:
         :param reference:
+        :param already_processed: indicates whether the texts have already been processed and embedded
         :return:
         """
-        candidate_emb, reference_emb = self.encode_texts(candidate, reference)
-        candidate_weights, reference_weights = self._get_weights(candidate_emb, reference_emb)
-        ids, rep_map = self._build_reference_lists(candidate_emb, reference_emb)
+        if not already_processed:
+            candidate, reference = self.encode_texts(candidate, reference)
+        candidate_weights, reference_weights = self._get_weights(candidate, reference)
+        ids, rep_map = self._build_reference_lists(candidate, reference)
         doc_dict = self._build_doc_dict(ids, candidate_weights, reference_weights)
         sms = self._perform_wmd(rep_map, doc_dict)
         return sms

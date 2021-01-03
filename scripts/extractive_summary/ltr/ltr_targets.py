@@ -15,6 +15,7 @@ import os
 from scripts.text.basic_text_processor import BasicTextProcessor
 from scripts.text.article_text_processor import ArticleTextProcessor
 from scripts.extractive_summary.ltr.learn_to_rank import LearnToRank
+from scripts.metrics.sms import SMS
 
 cuda = torch.device('cuda')
 
@@ -23,7 +24,7 @@ class LTRTargets(LearnToRank):
     """
     Class that contains metrics and distances used to build targets for a Learning to Rank algorithm.
     """
-    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'cosine_tf', 'wmd', 'leve', 'cosine_emb']
+    AVAILABLE_METRICS = ['rouge', 'cosine_tfidf', 'cosine_tf', 'wmd', 'leve', 'cosine_emb', 'sms']
     ROUGE_PARAMS = ['rouge_mode', 'rouge_metric']
     LTR_TYPE = 'targets'
 
@@ -38,6 +39,7 @@ class LTRTargets(LearnToRank):
         self.text_proc = BasicTextProcessor()
         self.drop_teams = processor.drop_teams if processor else drop_teams
         self.lemma = processor.lemma if processor else lemma
+        self.model = SentenceTransformer(metric_params['embedding']) if 'embedding' in metric_params else None
 
     def config(self) -> Dict:
         return {
@@ -188,12 +190,10 @@ class LTRTargets(LearnToRank):
                 print()
         return event_article_list
 
-    def cosine_distance_sent_emb(self, match_dict: Dict, verbose: bool, embedding: str, text_process: str = None):
+    def _perform_embedding(self, match_dict: Dict, text_process: str = None):
         """
-        This function uses sentence embeddings to represent the events and the sentences of the article, and then
-        applies the cosine distance to obtain the nearest sentence in the article for each event.
+        Performs sentence embedding over events and articles. Returns embeddings and processed texts.
         :param match_dict:
-        :param verbose:
         :param embedding: name of the model used to obtain the embedding.
         See https://github.com/UKPLab/sentence-transformers
         :param text_process: whether to preprocess the article text
@@ -205,10 +205,23 @@ class LTRTargets(LearnToRank):
             proc_events = match_dict['events']
             article_sentences = self.text_proc.get_sentences(match_dict['article'])
             proc_article_sents = [str(sent).replace('\n', '') for sent in article_sentences]
-        model = SentenceTransformer(embedding)
 
-        events_embeddings = model.encode(proc_events)
-        article_embeddings = model.encode(proc_article_sents)
+        events_embeddings = self.model.encode(proc_events)
+        article_embeddings = self.model.encode(proc_article_sents)
+        # torch.cuda.empty_cache()
+        return events_embeddings, article_embeddings, proc_events, proc_article_sents
+
+    def cosine_distance_sent_emb(self, match_dict: Dict, verbose: bool, **emb_options):
+        """
+        This function uses sentence embeddings to represent the events and the sentences of the article, and then
+        applies the cosine distance to obtain the nearest sentence in the article for each event.
+        :param match_dict:
+        :param verbose:
+        :param emb_options: params for _perform_embedding
+        :return:
+        """
+        events_embeddings, article_embeddings, proc_events, proc_article_sents =\
+            self._perform_embedding(match_dict, **emb_options)
 
         distances = cosine_similarity(events_embeddings, article_embeddings)
         sentences_ixs = distances.argmax(axis=1)
@@ -226,6 +239,12 @@ class LTRTargets(LearnToRank):
                 print('Processed article sentence:', proc_article_sents[sentences_ixs[event_ix]])
                 print()
         return event_article_list
+
+    def sms_similarity(self, match_dict: Dict, verbose: bool, **emb_options):
+        events_embeddings, article_embeddings, proc_events, proc_article_sents =\
+            self._perform_embedding(match_dict, **emb_options)
+        sms = SMS(emb_options['embedding'])
+        pass
 
     def create_match_targets(self, match_dict: Dict, verbose: bool, league_season_teams: Optional[str] = None):
         """
@@ -252,6 +271,8 @@ class LTRTargets(LearnToRank):
             event_article_list = self.levenshtein(match_dict, verbose, **self.metric_params)
         elif self.metric == 'cosine_emb':
             event_article_list = self.cosine_distance_sent_emb(match_dict, verbose, **self.metric_params)
+        elif self.metric == 'sms':
+            event_article_list = self.sms_similarity(match_dict, verbose, **self.metric_params)
         else:
             raise ValueError('Metric {} is not available. Try one of {}'.format(self.metric,
                                                                                 self.AVAILABLE_METRICS))
