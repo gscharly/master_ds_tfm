@@ -1,5 +1,6 @@
 # Automatic generation of sport news
 
+## Abstract
 Natural Language Processing techniques are currently one of the most active investigation fields in the area of Computer Science and Machine Learning.
 These techniques can be applied to multiple applications, such as text summarization. The goal of text summarization is to provide a new and shorter text from a reference, keeping the main information.
 
@@ -17,3 +18,15 @@ Finally, the last solution treats the problem as a ranking problem, where each e
 These events are evaluated in two different ways. The first one is one of the most used metrics to evaluate summaries (ROUGE), and it is based on counting the common words or
 word sequences in both texts. Despite being widely used, this metric comes with a drawback: it can’t capture semantic relationships. To address this issue,
 the use of a similarity based on word embeddings is proposed (SMS).
+
+## Code structure
+- analysis: notebooks with EDAs, model metrics, experiments...
+- scrapers: package with web scrapers
+- scripts: main package with most processes
+  - data: scrapers information unification
+  - experiments: abstract interface for experiments
+  - extractive_summary: extractive summary scripts
+  - metrics: evaluation metrics
+  - models: model training and metrics definition
+  - text: basic NLP processing
+
